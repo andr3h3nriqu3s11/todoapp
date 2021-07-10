@@ -3,9 +3,9 @@ import 'package:app/Task.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
-import 'package:timezone/browser.dart';
 import 'package:timezone/data/latest.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/standalone.dart' as tz;
 
 import 'Utils.dart';
 
@@ -68,23 +68,37 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future checkTasks() async {
-    Location location =
+    tz.Location location =
         tz.getLocation(await FlutterNativeTimezone.getLocalTimezone());
     for (var task in tasks) {
       if (!task.done) {
         if (task.taskType is TaskTypeOnce &&
             generalNotificationDetails != null) {
-          var date = tz.TZDateTime.from(
-              task.date!.subtract(Duration(minutes: 15)), location);
-          localNotification.zonedSchedule(
-              task.id,
-              "A task needs to be done",
-              "The task: " + task.title + " needs to be completed.",
-              date,
-              generalNotificationDetails!,
-              uiLocalNotificationDateInterpretation:
-                  UILocalNotificationDateInterpretation.absoluteTime,
-              androidAllowWhileIdle: true);
+          print("DEBUG: task:" + task.title);
+          if (task.date!.isBefore(DateTime.now())) {
+            task.done = true;
+            task.fail = true;
+          } else if (task.date!
+              .subtract(Duration(minutes: 15))
+              .isBefore(DateTime.now())) {
+            localNotification.show(
+                task.id,
+                "A task needs to be done",
+                "The Task: " + task.title + " needs to be completed.",
+                generalNotificationDetails!);
+          } else {
+            var date = tz.TZDateTime.from(
+                task.date!.subtract(Duration(minutes: 15)), location);
+            localNotification.zonedSchedule(
+                task.id,
+                "A task needs to be done",
+                "The task: " + task.title + " needs to be completed.",
+                date,
+                generalNotificationDetails!,
+                uiLocalNotificationDateInterpretation:
+                    UILocalNotificationDateInterpretation.absoluteTime,
+                androidAllowWhileIdle: true);
+          }
         }
       }
     }
@@ -114,6 +128,8 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       taskGenerators = t;
     });
+    localNotification.cancelAll();
+    checkTasks();
   }
 
   Widget _buildDoneTask() {
@@ -137,7 +153,7 @@ class _MyHomePageState extends State<MyHomePage> {
     //Create Widgets out of it
     List<Widget> taskWidgets = tasks
         .map((Task e) => Tuple(k: index, t: e))
-        .where((Tuple t) => !t.t.done)
+        .where((Tuple t) => t.t.done)
         .map((t) => TaskWidget(task: t.t, taskChanged: taskChanged(t.k)))
         .toList();
 
@@ -161,6 +177,7 @@ class _MyHomePageState extends State<MyHomePage> {
         setState(() {
           tasks[index] = task;
           if (task.done) {
+            localNotification.cancel(task.id);
             generateTasks();
             lastTaskDone = Tuple(k: index, t: task);
           } else if (lastTaskDone != null && lastTaskDone!.k == index) {

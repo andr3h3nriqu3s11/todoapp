@@ -7,10 +7,12 @@ class Task {
       this.date,
       this.icon,
       this.done = false,
+      this.fail = false,
       this.taskType});
   int id;
   String title;
   bool done;
+  bool fail;
   IconData? icon;
   DateTime? date;
   TaskType? taskType;
@@ -25,6 +27,7 @@ class Task {
         title: this.title,
         date: this.date,
         done: this.done,
+        fail: this.fail,
         taskType: this.taskType);
   }
 }
@@ -54,7 +57,8 @@ class TaskTypeOnce extends TaskType {
     Task newTask = baseTask.clone();
     newTask.date = this.date;
     newTask.id = this.id;
-    return baseTask;
+    newTask.taskType = this;
+    return newTask;
   }
 
   @override
@@ -95,7 +99,11 @@ class TaskWidget extends StatelessWidget {
                       Container(
                           child: TaskWidgetIcon(
                               onPressed: onPressed,
-                              background: task.done ? Colors.blue : Colors.grey,
+                              background: task.done
+                                  ? task.fail
+                                      ? Colors.red
+                                      : Colors.blue
+                                  : Colors.grey,
                               icon: task.icon)),
                       Text(task.title),
                     ],
