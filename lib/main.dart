@@ -1,15 +1,21 @@
 import 'package:app/EditNewItem.dart';
+import 'package:app/Start.dart';
 import 'package:app/Task.dart';
+import 'package:app/podo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:sembast/sembast.dart';
+import 'package:sembast/sembast_io.dart';
+import 'package:path/path.dart';
 import 'package:timezone/data/latest.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/standalone.dart' as tz;
 
 import 'Utils.dart';
 
-void main() {
+void main() async {
   runApp(const MyApp());
 }
 
@@ -38,17 +44,53 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  //Notification stuff
   FlutterLocalNotificationsPlugin localNotification =
       FlutterLocalNotificationsPlugin();
   NotificationDetails? generalNotificationDetails;
+
+  // Things to be used by the page
+  int _selectedIndex = 0;
+
+  //Local Database
+  Database? db;
+  StoreRef? store;
+
+  //User Data
+  Profile? profile;
+  bool isProfileCreated = false;
+  //  Tasks:
   List<TaskGenerator> taskGenerators = [];
   List<Task> tasks = [];
   Tuple<int, Task>? lastTaskDone;
-  int _selectedIndex = 0;
+
+  //Set up Load Database
+  Future startDb() async {
+    DatabaseFactory dbFactory = databaseFactoryIo;
+    //Use the dbFactory to open the database with a path
+    // Get app path so we can use store files
+    var dir = await getApplicationDocumentsDirectory();
+    await dir.create(recursive: true);
+    var dbPath = join(dir.path, "database.db");
+    this.db = await dbFactory.openDatabase(dbPath);
+    this.store = StoreRef.main();
+
+    //Load data from database
+    //  Loading data for user
+    if (await store!.record('profile').exists(db!)) {
+      profile = Profile.fromJson(
+          await store!.record('profile').get(db!) as Map<String, Map>);
+      isProfileCreated = true;
+    } else {
+      profile = Profile(level: 0, money: 0, xp: 0, name: '');
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    //Start db
+    startDb();
     // Android default settings takes the icon name if the icon does not exist
     //on the drawable folder an error will be thrown
     var androidInitilize = new AndroidInitializationSettings("ic_launcher");
@@ -63,8 +105,8 @@ class _MyHomePageState extends State<MyHomePage> {
     var iosDetails = new IOSNotificationDetails();
     generalNotificationDetails =
         new NotificationDetails(android: androidDetail, iOS: iosDetails);
-    checkTasks();
     initializeTimeZones();
+    checkTasks();
   }
 
   Future checkTasks() async {
@@ -104,7 +146,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void _newItemPage() {
+  void _newItemPage(BuildContext context) {
     Navigator.push(
         context,
         MaterialPageRoute(
@@ -234,6 +276,18 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    //Return the create page
+    if (!isProfileCreated) {
+      return CreateAccount(
+          profile: this.profile!,
+          done: (Profile p) {
+            setState(() {
+              this.profile = p;
+              isProfileCreated = true;
+            });
+          });
+    }
+    //Return the main app
     return Scaffold(
       body: Center(
         child: _selectedIndex == 1 ? _buildDoneTask() : _buildToDoTask(),
@@ -244,6 +298,8 @@ class _MyHomePageState extends State<MyHomePage> {
           BottomNavigationBarItem(
               icon: const Icon(Icons.access_time_filled_sharp),
               label: 'Old Tasks'),
+          BottomNavigationBarItem(
+              icon: const Icon(Icons.person), label: 'Profile'),
         ],
         currentIndex: _selectedIndex,
         onTap: (int value) {
@@ -253,7 +309,7 @@ class _MyHomePageState extends State<MyHomePage> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _newItemPage,
+        onPressed: () => _newItemPage(context),
         tooltip: 'Add new task',
         child: const Icon(Icons.add),
       ),
