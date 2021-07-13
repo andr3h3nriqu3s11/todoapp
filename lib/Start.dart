@@ -1,6 +1,6 @@
 //This file will have the classes and login for the startup of the app
 
-import 'package:app/podo.dart';
+import 'package:app/Profile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 

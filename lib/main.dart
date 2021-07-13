@@ -1,7 +1,7 @@
 import 'package:app/EditNewItem.dart';
+import 'package:app/Profile.dart';
 import 'package:app/Start.dart';
 import 'package:app/Task.dart';
-import 'package:app/podo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
@@ -284,13 +284,18 @@ class _MyHomePageState extends State<MyHomePage> {
             setState(() {
               this.profile = p;
               isProfileCreated = true;
+              this.store!.record("profile").put(this.db!, p);
             });
           });
     }
     //Return the main app
     return Scaffold(
       body: Center(
-        child: _selectedIndex == 1 ? _buildDoneTask() : _buildToDoTask(),
+        child: _selectedIndex == 1
+            ? _buildDoneTask()
+            : _selectedIndex == 2
+                ? _buildToDoTask()
+                : ProfileWidget(profile: this.profile!),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: [
