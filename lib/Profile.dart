@@ -62,4 +62,13 @@ class Profile {
       this.xp += xp;
     }
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      "name": this.name,
+      "level": this.level,
+      "xp": this.xp,
+      "money": this.money
+    };
+  }
 }

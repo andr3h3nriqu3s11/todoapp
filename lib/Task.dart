@@ -8,6 +8,12 @@ class Task {
       this.icon,
       this.done = false,
       this.fail = false,
+      this.xp = 0,
+      this.money = 0,
+      this.moneyLost = 0,
+      this.xpLost = 0,
+      this.directToFail = false,
+      this.userRemovedFromFail = false,
       this.taskType});
   int id;
   String title;
@@ -16,6 +22,14 @@ class Task {
   IconData? icon;
   DateTime? date;
   TaskType? taskType;
+  //Control
+  bool directToFail;
+  bool userRemovedFromFail;
+  //Profile Effects
+  double xp;
+  double money;
+  double xpLost;
+  double moneyLost;
 
   static emptyTask() {
     return new Task(title: "");
@@ -39,12 +53,40 @@ class TaskGenerator {
 }
 
 abstract class TaskType {
+  TaskType(
+      {required this.xpPerTask,
+      required this.xpPerTaskCombo,
+      required this.moneyPerTask,
+      required this.moneyPerTaskCombo,
+      required this.xpLost,
+      required this.moneyLost});
   Task generate(Task baseTask);
   bool finished();
+  double xpPerTask;
+  double xpPerTaskCombo;
+  double moneyPerTask;
+  double moneyPerTaskCombo;
+  double xpLost;
+  double moneyLost;
 }
 
 class TaskTypeOnce extends TaskType {
-  TaskTypeOnce({required this.date, required this.id});
+  TaskTypeOnce(
+      {required double xpPerTask,
+      required double xpPerTaskCombo,
+      required double moneyPerTask,
+      required double moneyPerTaskCombo,
+      required double xpLost,
+      required double moneyLost,
+      required this.date,
+      required this.id})
+      : super(
+            xpPerTask: xpPerTask,
+            xpLost: xpLost,
+            xpPerTaskCombo: xpPerTaskCombo,
+            moneyLost: moneyLost,
+            moneyPerTask: moneyPerTask,
+            moneyPerTaskCombo: moneyPerTaskCombo);
 
   DateTime date;
   int id;
@@ -58,6 +100,10 @@ class TaskTypeOnce extends TaskType {
     newTask.date = this.date;
     newTask.id = this.id;
     newTask.taskType = this;
+    newTask.xp = this.xpPerTask;
+    newTask.money = this.moneyPerTask;
+    newTask.xpLost = this.xpLost;
+    newTask.moneyLost = this.moneyLost;
     return newTask;
   }
 
@@ -80,6 +126,23 @@ class TaskWidget extends StatelessWidget {
       a.done = !a.done;
       taskChanged(a);
     };
+    var onLongPress = () {
+      var a = task;
+      if (!a.done) {
+        //Because its going from not done -> fail
+        a.directToFail = true;
+        a.done = true;
+        a.fail = true;
+      } else if (!a.fail) {
+        a.directToFail = false;
+        a.done = true;
+        a.fail = true;
+      } else {
+        onPressed();
+        return;
+      }
+      taskChanged(a);
+    };
 
     return Container(
         color: Colors.grey.shade500,
@@ -99,6 +162,7 @@ class TaskWidget extends StatelessWidget {
                       Container(
                           child: TaskWidgetIcon(
                               onPressed: onPressed,
+                              onLongPress: onLongPress,
                               background: task.done
                                   ? task.fail
                                       ? Colors.red
@@ -116,32 +180,34 @@ class TaskWidget extends StatelessWidget {
 
 class TaskWidgetIcon extends StatelessWidget {
   const TaskWidgetIcon(
-      {Key? key, this.icon, this.background, required this.onPressed})
+      {Key? key,
+      this.icon,
+      this.background,
+      required this.onPressed,
+      this.onLongPress})
       : super(key: key);
 
   final IconData? icon;
   final Color? background;
 
   final void Function() onPressed;
+  final void Function()? onLongPress;
 
   @override
   Widget build(BuildContext context) {
-    return icon != null
-        ? Ink(
-            decoration:
-                ShapeDecoration(shape: CircleBorder(), color: background),
-            child: IconButton(onPressed: onPressed, icon: Icon(icon)))
-        : ElevatedButton(
-            onPressed: onPressed,
-            style: ButtonStyle(
-              shape: MaterialStateProperty.all<CircleBorder>(CircleBorder()),
-              backgroundColor: background == null
-                  ? null
-                  : MaterialStateProperty.all<Color>(background!),
-            ),
-            child: const Padding(
-              padding: const EdgeInsets.all(1.0),
-            ),
-          );
+    return ElevatedButton(
+      onPressed: onPressed,
+      onLongPress: onLongPress,
+      style: ButtonStyle(
+        shape: MaterialStateProperty.all<CircleBorder>(CircleBorder()),
+        backgroundColor: background == null
+            ? null
+            : MaterialStateProperty.all<Color>(background!),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(1.0),
+        child: icon != null ? Icon(icon) : null,
+      ),
+    );
   }
 }

@@ -117,9 +117,11 @@ class _MyHomePageState extends State<MyHomePage> {
         if (task.taskType is TaskTypeOnce &&
             generalNotificationDetails != null) {
           print("DEBUG: task:" + task.title);
-          if (task.date!.isBefore(DateTime.now())) {
+          if (task.date!.isBefore(DateTime.now()) &&
+              !task.userRemovedFromFail) {
             task.done = true;
             task.fail = true;
+            task.directToFail = true;
           } else if (task.date!
               .subtract(Duration(minutes: 15))
               .isBefore(DateTime.now())) {
@@ -174,23 +176,35 @@ class _MyHomePageState extends State<MyHomePage> {
     checkTasks();
   }
 
+  //TODO: Inprove this comment
+  //Note: When removing from fail don't change task.fail only change task.done to false
+  taskChanged(int index) {
+    return (Task task) {
+      if (task.fail && !task.done) {
+        task.userRemovedFromFail = true;
+        task.fail = false;
+        //TODO: Remove points from user
+
+        //This needs to be done after the removal because this is needed by the process of removal
+        task.directToFail = false;
+        tasks[index] = task;
+        return;
+      }
+      tasks[index] = task;
+      if (task.done) {
+        localNotification.cancel(task.id);
+        generateTasks();
+        lastTaskDone = Tuple(k: index, t: task);
+        //TODO: Add points to user
+      } else if (lastTaskDone != null && lastTaskDone!.k == index) {
+        lastTaskDone = null;
+      }
+    };
+  }
+
   Widget _buildDoneTask() {
     //Get rigth taks
     int index = 0;
-
-    var taskChanged = (int index) {
-      return (Task task) {
-        setState(() {
-          tasks[index] = task;
-          if (task.done) {
-            generateTasks();
-            lastTaskDone = Tuple(k: index, t: task);
-          } else if (lastTaskDone != null && lastTaskDone!.k == index) {
-            lastTaskDone = null;
-          }
-        });
-      };
-    };
 
     //Create Widgets out of it
     List<Widget> taskWidgets = tasks
@@ -213,21 +227,6 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget _buildToDoTask() {
     //Get rigth taks
     int index = 0;
-
-    var taskChanged = (int index) {
-      return (Task task) {
-        setState(() {
-          tasks[index] = task;
-          if (task.done) {
-            localNotification.cancel(task.id);
-            generateTasks();
-            lastTaskDone = Tuple(k: index, t: task);
-          } else if (lastTaskDone != null && lastTaskDone!.k == index) {
-            lastTaskDone = null;
-          }
-        });
-      };
-    };
 
     //Create Widgets out of it
     List<Widget> taskWidgets = tasks
@@ -279,22 +278,23 @@ class _MyHomePageState extends State<MyHomePage> {
     //Return the create page
     if (!isProfileCreated) {
       return CreateAccount(
-          profile: this.profile!,
+          profile: this.profile ?? Profile(level: 0, xp: 0, money: 0, name: ''),
           done: (Profile p) {
             setState(() {
               this.profile = p;
               isProfileCreated = true;
-              this.store!.record("profile").put(this.db!, p);
+              this.store!.record("profile").put(this.db!, p.toJson());
             });
           });
     }
     //Return the main app
     return Scaffold(
       body: Center(
-        child: _selectedIndex == 1
+        child: _selectedIndex == 0
             ? _buildDoneTask()
-            : _selectedIndex == 2
+            : _selectedIndex == 1
                 ? _buildToDoTask()
+                //TODO: Add Space between this and top
                 : ProfileWidget(profile: this.profile!),
       ),
       bottomNavigationBar: BottomNavigationBar(

@@ -40,18 +40,24 @@ class EditNewItem extends StatefulWidget {
 }
 
 class _EditNewItemState extends State<EditNewItem> {
+  //Main data
   String _name = "";
   int _taskTypeValue = 0;
   DateTime _onceDate = DateTime.now();
   TimeOfDay _onceTime = TimeOfDay.now();
   IconData? icon;
+  //Profile part
+  double xpPerTask = 0;
+  double xpPerTaskCombo = 0;
+  double moneyPerTask = 0;
+  double moneyPerTaskCombo = 0;
+  double xpLost = 0;
+  double moneyLost = 0;
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   TaskGenerator? submit() {
-    if (!_formKey.currentState!.validate()) {
-      return null;
-    }
+    if (!_formKey.currentState!.validate()) return null;
 
     _formKey.currentState!.save();
 
@@ -62,10 +68,15 @@ class _EditNewItemState extends State<EditNewItem> {
       taskType = TaskTypeOnce(
           date: DateTime(_onceDate.year, _onceDate.month, _onceDate.day,
               _onceTime.hour, _onceTime.minute, 0, 0, 0),
-          id: new Random().nextInt(100000).floor());
-    } else {
+          id: new Random().nextInt(100000).floor(),
+          xpPerTaskCombo: this.xpPerTaskCombo,
+          xpLost: this.xpLost,
+          xpPerTask: this.xpPerTask,
+          moneyLost: this.moneyLost,
+          moneyPerTask: this.moneyPerTask,
+          moneyPerTaskCombo: this.moneyPerTaskCombo);
+    } else
       return null;
-    }
 
     TaskGenerator g = TaskGenerator(type: taskType, base: t);
     return g;
@@ -140,6 +151,153 @@ class _EditNewItemState extends State<EditNewItem> {
     );
   }
 
+  Widget _buildPlayerActions() {
+    return Column(
+      children: [
+        Container(
+            margin: EdgeInsets.only(top: 10),
+            child: Row(
+              children: [
+                Expanded(
+                    child: Container(
+                  decoration: BoxDecoration(color: Colors.white, boxShadow: [
+                    BoxShadow(
+                        color: Colors.grey,
+                        blurRadius: 10,
+                        offset: Offset(0, 3))
+                  ]),
+                  child: Padding(
+                    child: Text('Player effects'),
+                    padding: EdgeInsets.symmetric(vertical: 8)
+                        .add(EdgeInsets.only(left: 10)),
+                  ),
+                )),
+              ],
+            )),
+        // The fields are about adding points per task done
+        // XP
+        Row(
+          children: [
+            //Xp per task
+            Expanded(
+                child: TextFormField(
+              decoration: InputDecoration(labelText: 'Xp once done'),
+              validator: (String? v) {
+                if (v == null || v.isEmpty)
+                  return 'This filed must have a value';
+                try {
+                  double.parse(v);
+                } catch (_) {
+                  return 'This filed must be a number';
+                }
+              },
+              onSaved: (String? v) {
+                if (v == null || v.isEmpty) return;
+                xpPerTask = double.parse(v);
+              },
+            )),
+            SizedBox(
+              width: 5,
+            ),
+            //Xp combo multiplier
+            Expanded(
+                child: TextFormField(
+              decoration: InputDecoration(labelText: 'Xp combo'),
+              validator: (String? v) {
+                if (v == null || v.isEmpty)
+                  return 'This filed must have a value';
+                try {
+                  double.parse(v);
+                } catch (_) {
+                  return 'This filed must be a number';
+                }
+              },
+              onSaved: (String? v) {
+                if (v == null || v.isEmpty) return;
+                xpPerTaskCombo = double.parse(v);
+              },
+            )),
+          ],
+        ),
+        // Money
+        Row(
+          children: [
+            //Money per task
+            Expanded(child: 
+            TextFormField(
+              decoration: InputDecoration(labelText: 'Money once done'),
+              validator: (String? v) {
+                if (v == null || v.isEmpty)
+                  return 'This filed must have a value';
+                try {
+                  double.parse(v);
+                } catch (_) {
+                  return 'This filed must be a number';
+                }
+              },
+              onSaved: (String? v) {
+                if (v == null || v.isEmpty) return;
+                moneyPerTask = double.parse(v);
+              },
+            )),
+            SizedBox(width: 5,),
+            //Money combo multiplier
+            Expanded(child: 
+            TextFormField(
+              decoration: InputDecoration(labelText: 'Money combo'),
+              validator: (String? v) {
+                if (v == null || v.isEmpty)
+                  return 'This filed must have a value';
+                try {
+                  double.parse(v);
+                } catch (_) {
+                  return 'This filed must be a number';
+                }
+              },
+              onSaved: (String? v) {
+                if (v == null || v.isEmpty) return;
+                moneyPerTaskCombo = double.parse(v);
+              },
+            )),
+          ],
+        ),
+        //Extra xp lost per task
+        TextFormField(
+          decoration: InputDecoration(labelText: 'Extra xp lost per task'),
+          validator: (String? v) {
+            if (v == null || v.isEmpty) return 'This filed must have a value';
+            try {
+              double.parse(v);
+            } catch (_) {
+              return 'This filed must be a number';
+            }
+          },
+          onSaved: (String? v) {
+            if (v == null || v.isEmpty) return;
+            xpLost = double.parse(v);
+          },
+        ),
+        //Extra money lost per task
+        TextFormField(
+          decoration:
+              InputDecoration(labelText: 'Extra money lost when faield'),
+          validator: (String? v) {
+            if (v == null || v.isEmpty) return 'This filed must have a value';
+            try {
+              double.parse(v);
+            } catch (_) {
+              return 'This filed must be a number';
+            }
+          },
+          onSaved: (String? v) {
+            if (v == null || v.isEmpty) return;
+            moneyLost = double.parse(v);
+          },
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -153,6 +311,7 @@ class _EditNewItemState extends State<EditNewItem> {
                 _buildTitle(),
                 _buildTypeSelector(),
                 if (_taskTypeValue == 1) _buildDateSelector(),
+                _buildPlayerActions(),
               ],
             )));
   }
