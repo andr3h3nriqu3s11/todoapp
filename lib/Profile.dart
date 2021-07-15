@@ -2,25 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 
 class ProfileWidget extends StatelessWidget {
-  const ProfileWidget({Key? key, required this.profile}) : super(key: key);
+  const ProfileWidget({Key? key, required this.profile, required this.logOut})
+      : super(key: key);
 
   final Profile profile;
+  final void Function() logOut;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
+        SizedBox(
+          height: 50,
+        ),
         Row(
           children: [
             Expanded(child: Text(profile.name)),
             Text("Lv:" + profile.level.toString())
           ],
         ),
-        Text('XP:'),
+        Text('XP: ${profile.xp}'),
         LinearProgressIndicator(
           value: profile.xp / profile.getLevelXp(),
         ),
+        ElevatedButton(onPressed: logOut, child: Text('Logout'))
       ],
     );
   }
@@ -48,19 +54,30 @@ class Profile {
   }
 
   getLevelXp() {
-    return 100 + (this.level - 1) * 200;
+    //TODO: Analize because level starts at 0 and maybe it should start at 1
+    return 100 + this.level * 200;
   }
 
   addXp(double xp) {
     if (this.xp + xp == getLevelXp()) {
       this.xp = 0;
-      this.level = this.level++;
+      this.level++;
     } else if (this.xp + xp > getLevelXp()) {
-      this.level = this.level++;
+      this.level++;
       this.addXp(xp - (getLevelXp() - this.xp));
     } else {
       this.xp += xp;
     }
+  }
+
+  removeXP(double xp) {
+    if (this.xp - xp >= 0) {
+      this.xp = this.xp - xp;
+      return;
+    }
+    this.level--;
+    this.xp = getLevelXp() - 1;
+    removeXP(xp - this.xp);
   }
 
   Map<String, dynamic> toJson() {

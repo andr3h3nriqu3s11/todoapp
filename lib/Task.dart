@@ -14,6 +14,7 @@ class Task {
       this.xpLost = 0,
       this.directToFail = false,
       this.userRemovedFromFail = false,
+      this.taskAddedPoints = false,
       this.taskType});
   int id;
   String title;
@@ -25,6 +26,7 @@ class Task {
   //Control
   bool directToFail;
   bool userRemovedFromFail;
+  bool taskAddedPoints;
   //Profile Effects
   double xp;
   double money;
@@ -145,7 +147,7 @@ class TaskWidget extends StatelessWidget {
     };
 
     return Container(
-        color: Colors.grey.shade500,
+        color: Color.fromARGB(255, 226, 226, 226),
         width: double.infinity,
         child: Padding(
             padding: const EdgeInsets.all(10.0),
@@ -166,8 +168,8 @@ class TaskWidget extends StatelessWidget {
                               background: task.done
                                   ? task.fail
                                       ? Colors.red
-                                      : Colors.blue
-                                  : Colors.grey,
+                                      : Colors.green
+                                  : Colors.blue,
                               icon: task.icon)),
                       Text(task.title),
                     ],

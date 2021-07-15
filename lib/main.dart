@@ -51,6 +51,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   // Things to be used by the page
   int _selectedIndex = 0;
+  bool loaded = false;
 
   //Local Database
   Database? db;
@@ -78,12 +79,21 @@ class _MyHomePageState extends State<MyHomePage> {
     //Load data from database
     //  Loading data for user
     if (await store!.record('profile').exists(db!)) {
-      profile = Profile.fromJson(
-          await store!.record('profile').get(db!) as Map<String, Map>);
-      isProfileCreated = true;
+      var tempProfile =
+          Profile.fromJson(await store!.record('profile').get(db!));
+      setState(() {
+        profile = tempProfile;
+        isProfileCreated = true;
+      });
     } else {
-      profile = Profile(level: 0, money: 0, xp: 0, name: '');
+      setState(() {
+        profile = Profile(level: 0, money: 0, xp: 0, name: '');
+      });
     }
+
+    setState(() {
+      loaded = true;
+    });
   }
 
   @override
@@ -112,16 +122,22 @@ class _MyHomePageState extends State<MyHomePage> {
   Future checkTasks() async {
     tz.Location location =
         tz.getLocation(await FlutterNativeTimezone.getLocalTimezone());
+    int index = 0;
     for (var task in tasks) {
+      index++;
       if (!task.done) {
         if (task.taskType is TaskTypeOnce &&
             generalNotificationDetails != null) {
-          print("DEBUG: task:" + task.title);
+          //Check the task
+          //If the task is already past the time and was not recoverd by the user
+          // then marked it as failed
           if (task.date!.isBefore(DateTime.now()) &&
               !task.userRemovedFromFail) {
             task.done = true;
             task.fail = true;
             task.directToFail = true;
+            //Call the task changed function to deal with the points
+            taskChanged(index)(task);
           } else if (task.date!
               .subtract(Duration(minutes: 15))
               .isBefore(DateTime.now())) {
@@ -176,29 +192,65 @@ class _MyHomePageState extends State<MyHomePage> {
     checkTasks();
   }
 
-  //TODO: Inprove this comment
-  //Note: When removing from fail don't change task.fail only change task.done to false
+  //! Note: When removing from fail only change to task.done to false
   taskChanged(int index) {
     return (Task task) {
+      print(task);
+      // something -> Fail -> not done
+      // The xp points and the money need to be restored
+      // something is defined by the directToFail if its true
+      //  then the task was failed without completing it first
       if (task.fail && !task.done) {
         task.userRemovedFromFail = true;
         task.fail = false;
-        //TODO: Remove points from user
-
+        setState(() {
+          //Restore the money and xp that is lost when a quest is failed
+          this.profile!.addXp(task.xpLost);
+          this.profile!.money += task.moneyLost;
+        });
         //This needs to be done after the removal because this is needed by the process of removal
         task.directToFail = false;
-        tasks[index] = task;
+        setState(() {
+          tasks[index] = task;
+          if (lastTaskDone != null && lastTaskDone!.k == index) {
+            lastTaskDone = null;
+          }
+        });
         return;
       }
-      tasks[index] = task;
-      if (task.done) {
-        localNotification.cancel(task.id);
-        generateTasks();
-        lastTaskDone = Tuple(k: index, t: task);
-        //TODO: Add points to user
-      } else if (lastTaskDone != null && lastTaskDone!.k == index) {
-        lastTaskDone = null;
-      }
+
+      setState(() {
+        //Task faild
+        if (task.done && task.fail) {
+          //If the task is directToFail then you only remove the fail xp/money
+          // If not the you remove the fail xp/money and the gain xp
+          this.profile!.removeXP(task.xpLost);
+          this.profile!.money -= task.moneyLost;
+          if (!task.directToFail) {
+            this.profile!.removeXP(task.xp);
+            this.profile!.money -= task.money;
+          }
+          lastTaskDone = Tuple(k: index, t: task);
+          task.taskAddedPoints = false;
+        } else if (task.done) {
+          localNotification.cancel(task.id);
+          generateTasks();
+          this.profile!.addXp(task.xp);
+          this.profile!.money += task.money;
+          lastTaskDone = Tuple(k: index, t: task);
+          task.taskAddedPoints = true;
+        } else if (lastTaskDone != null && lastTaskDone!.k == index) {
+          lastTaskDone = null;
+        }
+
+        // done -> not done
+        if (!task.done && task.taskAddedPoints && !task.fail) {
+          task.taskAddedPoints = false;
+          this.profile!.removeXP(task.xp);
+          this.profile!.money -= task.money;
+        }
+        tasks[index] = task;
+      });
     };
   }
 
@@ -275,6 +327,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    //TODO: Inprove loading page
+    //Loading page
+    if (!loaded) {
+      return Container(
+        color: Colors.blue,
+      );
+    }
     //Return the create page
     if (!isProfileCreated) {
       return CreateAccount(
@@ -291,13 +350,25 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       body: Center(
         child: _selectedIndex == 0
-            ? _buildDoneTask()
+            ? _buildToDoTask()
             : _selectedIndex == 1
-                ? _buildToDoTask()
-                //TODO: Add Space between this and top
-                : ProfileWidget(profile: this.profile!),
+                ? _buildDoneTask()
+                : ProfileWidget(
+                    profile: this.profile!,
+                    //TODO: Inprove this
+                    logOut: () {
+                      setState(() {
+                        this.profile =
+                            Profile(level: 0, xp: 0, money: 0, name: '');
+                        this.store!.record('profile').delete(this.db!);
+                        isProfileCreated = false;
+                        tasks = [];
+                      });
+                    },
+                  ),
       ),
       bottomNavigationBar: BottomNavigationBar(
+        //TODO: inprove this
         items: [
           BottomNavigationBarItem(icon: const Icon(Icons.list), label: 'Tasks'),
           BottomNavigationBarItem(
