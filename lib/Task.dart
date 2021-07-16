@@ -62,8 +62,9 @@ abstract class TaskType {
       required this.moneyPerTaskCombo,
       required this.xpLost,
       required this.moneyLost});
-  Task generate(Task baseTask);
+  Task generate(Task baseTask, List<Task> oldTasks);
   bool finished();
+  Task? generateGhostTask(Task baseTask, List<Task> oldTasks);
   double xpPerTask;
   double xpPerTaskCombo;
   double moneyPerTask;
@@ -96,7 +97,7 @@ class TaskTypeOnce extends TaskType {
   bool done = false;
 
   @override
-  Task generate(Task baseTask) {
+  Task generate(Task baseTask, List<Task> oldTasks) {
     done = true;
     Task newTask = baseTask.clone();
     newTask.date = this.date;
@@ -112,6 +113,59 @@ class TaskTypeOnce extends TaskType {
   @override
   bool finished() {
     return done;
+  }
+
+  @override
+  Task? generateGhostTask(Task baseTask, List<Task> oldTasks) {
+    return null;
+  }
+}
+
+class TaskTypeRepeatEveryDay extends TaskType {
+  TaskTypeRepeatEveryDay(
+      {required double xpPerTask,
+      required double xpPerTaskCombo,
+      required double moneyPerTask,
+      required double moneyPerTaskCombo,
+      required double xpLost,
+      required double moneyLost,
+      required this.date,
+      required this.id})
+      : super(
+            xpPerTask: xpPerTask,
+            xpLost: xpLost,
+            xpPerTaskCombo: xpPerTaskCombo,
+            moneyLost: moneyLost,
+            moneyPerTask: moneyPerTask,
+            moneyPerTaskCombo: moneyPerTaskCombo);
+
+  int id;
+  DateTime date;
+  bool done = false;
+
+  @override
+  Task generate(Task baseTask, List<Task> oldTasks) {
+    //done = true;
+    Task newTask = baseTask.clone();
+    newTask.date = this.date;
+    newTask.id = this.id;
+    newTask.taskType = this;
+    newTask.xp = this.xpPerTask;
+    newTask.money = this.moneyPerTask;
+    newTask.xpLost = this.xpLost;
+    newTask.moneyLost = this.moneyLost;
+    return newTask;
+  }
+
+  @override
+  bool finished() {
+    return done;
+  }
+
+  @override
+  Task? generateGhostTask(Task baseTask, List<Task> oldTasks) {
+    // TODO: implement generateGhostTask
+    throw UnimplementedError();
   }
 }
 

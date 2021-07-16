@@ -182,7 +182,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void generateTasks() {
     List<TaskGenerator> t = [];
     for (var a in taskGenerators) {
-      tasks.add(a.type.generate(a.base));
+      tasks.add(a.type.generate(a.base, tasks));
       if (!a.type.finished()) t.add(a);
     }
     setState(() {
