@@ -53,7 +53,7 @@ class Profile {
     );
   }
 
-  getLevelXp() {
+  int getLevelXp() {
     //TODO: Analize because level starts at 0 and maybe it should start at 1
     return 100 + this.level * 200;
   }
@@ -76,8 +76,6 @@ class Profile {
       return;
     }
     this.level--;
-    this.xp = getLevelXp() - 1;
-    removeXP(xp - this.xp);
   }
 
   Map<String, dynamic> toJson() {

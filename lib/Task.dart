@@ -46,12 +46,72 @@ class Task {
         fail: this.fail,
         taskType: this.taskType);
   }
+
+  Map<String, dynamic> toJSON() {
+    var icon = this.icon == null
+        ? null
+        : {
+            "codePoint": this.icon?.codePoint,
+            "fontFamily": this.icon?.fontFamily,
+            "fontPackage": this.icon?.fontPackage,
+            "matchTextDirection": this.icon?.matchTextDirection,
+          };
+    return {
+      "id": this.id,
+      "title": this.title,
+      "done": this.done,
+      "fail": this.fail,
+      "icon": icon,
+      "date": this.date == null ? null : this.date!.toIso8601String(),
+      "taskType": this.taskType == null ? null : this.taskType!.toJson(),
+      "directToFail": this.directToFail,
+      "taskAddedPoints": this.taskAddedPoints,
+      "xp": this.xp,
+      "money": this.money,
+      "xpLost": this.xpLost,
+      "moneyLost": this.moneyLost,
+    };
+  }
+
+  factory Task.fromJson(Map<String, dynamic> json) {
+    var icon = json["icon"] != null
+        ? IconData(json["icon"]["codePoint"],
+            fontFamily: json["icon"]["fontFamily"],
+            fontPackage: json["icon"]["fontPackage"],
+            matchTextDirection: json["icon"]["matchTextDirection"])
+        : null;
+    return Task(
+      id: json["id"],
+      title: json["title"],
+      done: json["done"],
+      fail: json["fail"],
+      icon: icon,
+      date: json["date"] == null ? null : DateTime.tryParse(json["date"]),
+      taskType:
+          json["taskType"] == null ? null : TaskType.fromJson(json["taskType"]),
+      directToFail: json["directToFail"],
+      taskAddedPoints: json["taskAddedPoints"],
+      xp: json["xp"],
+      money: json["money"],
+      xpLost: json["xpLost"],
+      moneyLost: json["moneyLost"],
+    );
+  }
 }
 
 class TaskGenerator {
   TaskGenerator({required this.type, required this.base});
   TaskType type;
   Task base;
+  Map<String, dynamic> toJson() {
+    return {"base": base.toJSON(), "type": type.toJson()};
+  }
+
+  factory TaskGenerator.fromJson(Map<String, dynamic> json) {
+    return TaskGenerator(
+        type: TaskType.fromJson(json["type"]),
+        base: Task.fromJson(json['base']));
+  }
 }
 
 abstract class TaskType {
@@ -62,9 +122,21 @@ abstract class TaskType {
       required this.moneyPerTaskCombo,
       required this.xpLost,
       required this.moneyLost});
-  Task generate(Task baseTask, List<Task> oldTasks);
+  Task? generate(Task baseTask, List<Task> oldTasks);
   bool finished();
   Task? generateGhostTask(Task baseTask, List<Task> oldTasks);
+  Map<String, dynamic> toJson();
+
+  factory TaskType.fromJson(Map<String, dynamic> json) {
+    if (json["type"] == "once") {
+      return TaskTypeOnce.fromJson(json["json"]);
+    } else if (json["type"] == "repeatEveryDay") {
+      return TaskTypeRepeatEveryDay.fromJson(json["json"]);
+    } else {
+      throw Exception("InvalidJson");
+    }
+  }
+
   double xpPerTask;
   double xpPerTaskCombo;
   double moneyPerTask;
@@ -82,7 +154,8 @@ class TaskTypeOnce extends TaskType {
       required double xpLost,
       required double moneyLost,
       required this.date,
-      required this.id})
+      required this.id,
+      this.done = false})
       : super(
             xpPerTask: xpPerTask,
             xpLost: xpLost,
@@ -119,6 +192,37 @@ class TaskTypeOnce extends TaskType {
   Task? generateGhostTask(Task baseTask, List<Task> oldTasks) {
     return null;
   }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      'type': 'once',
+      'json': {
+        "xpPerTask": this.xpPerTask,
+        "xpLost": this.xpLost,
+        "xpPerTaskCombo": this.xpPerTaskCombo,
+        "moneyList": this.moneyLost,
+        "moneyPerTask": this.moneyPerTask,
+        "moneyPerTaskCombo": this.moneyPerTaskCombo,
+        "done": this.done,
+        "id": this.id,
+        "date": date.toIso8601String()
+      }
+    };
+  }
+
+  factory TaskTypeOnce.fromJson(Map<String, dynamic> json) {
+    return TaskTypeOnce(
+        date: DateTime.tryParse(json["date"])!,
+        moneyLost: json["moneyLost"],
+        moneyPerTask: json["moneyPerTask"],
+        moneyPerTaskCombo: json["moneyPerTaskCombo"],
+        xpLost: json["xpLost"],
+        xpPerTask: json["xpPerTask"],
+        xpPerTaskCombo: json["xpPerTaskCombo"],
+        id: json["id"],
+        done: json["done"]);
+  }
 }
 
 class TaskTypeRepeatEveryDay extends TaskType {
@@ -130,6 +234,7 @@ class TaskTypeRepeatEveryDay extends TaskType {
       required double xpLost,
       required double moneyLost,
       required this.date,
+      this.done = false,
       required this.id})
       : super(
             xpPerTask: xpPerTask,
@@ -144,10 +249,32 @@ class TaskTypeRepeatEveryDay extends TaskType {
   bool done = false;
 
   @override
-  Task generate(Task baseTask, List<Task> oldTasks) {
+  Task? generate(Task baseTask, List<Task> oldTasks) {
     //done = true;
+
+    Task? lastTask;
+
+    oldTasks
+        .where((element) => element.taskType is TaskTypeRepeatEveryDay)
+        .forEach((element) {
+      if (lastTask == null && element.date != null) {
+        lastTask = element;
+      } else if (lastTask != null &&
+          element.date != null &&
+          lastTask!.date!.isBefore(element.date!)) {
+        lastTask = element;
+      }
+    });
+
+    DateTime today = DateTime.now();
+    if (today.year == lastTask!.date!.year &&
+        today.month == lastTask!.date!.month &&
+        today.day == lastTask!.date!.day) return null;
+
+    //Generate new task
     Task newTask = baseTask.clone();
-    newTask.date = this.date;
+    newTask.date = DateTime(
+        today.year, today.month, today.day, this.date.hour, this.date.minute);
     newTask.id = this.id;
     newTask.taskType = this;
     newTask.xp = this.xpPerTask;
@@ -164,8 +291,69 @@ class TaskTypeRepeatEveryDay extends TaskType {
 
   @override
   Task? generateGhostTask(Task baseTask, List<Task> oldTasks) {
-    // TODO: implement generateGhostTask
-    throw UnimplementedError();
+    Task? lastTask;
+
+    oldTasks
+        .where((element) => element.taskType is TaskTypeRepeatEveryDay)
+        .forEach((element) {
+      if (lastTask == null && element.date != null) {
+        lastTask = element;
+      } else if (lastTask != null &&
+          element.date != null &&
+          lastTask!.date!.isBefore(element.date!)) {
+        lastTask = element;
+      }
+    });
+
+    DateTime today = DateTime.now();
+    if (today.year != lastTask!.date!.year ||
+        today.month != lastTask!.date!.month ||
+        today.day != lastTask!.date!.day) return null;
+
+    DateTime tomorrow = DateTime.now().add(Duration(hours: 24));
+
+    //Generate new task
+    Task newTask = baseTask.clone();
+    newTask.date = DateTime(tomorrow.year, tomorrow.month, tomorrow.day,
+        this.date.hour, this.date.minute);
+    newTask.id = this.id;
+    newTask.taskType = this;
+    newTask.xp = this.xpPerTask;
+    newTask.money = this.moneyPerTask;
+    newTask.xpLost = this.xpLost;
+    newTask.moneyLost = this.moneyLost;
+    return newTask;
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      'type': 'repeatEveryDay',
+      'json': {
+        "xpPerTask": this.xpPerTask,
+        "xpLost": this.xpLost,
+        "xpPerTaskCombo": this.xpPerTaskCombo,
+        "moneyList": this.moneyLost,
+        "moneyPerTask": this.moneyPerTask,
+        "moneyPerTaskCombo": this.moneyPerTaskCombo,
+        "done": this.done,
+        "id": this.id,
+        "date": date.toIso8601String()
+      }
+    };
+  }
+
+  factory TaskTypeRepeatEveryDay.fromJson(Map<String, dynamic> json) {
+    return TaskTypeRepeatEveryDay(
+        date: DateTime.tryParse(json["date"])!,
+        moneyLost: json["moneyLost"],
+        moneyPerTask: json["moneyPerTask"],
+        moneyPerTaskCombo: json["moneyPerTaskCombo"],
+        xpLost: json["xpLost"],
+        xpPerTask: json["xpPerTask"],
+        xpPerTaskCombo: json["xpPerTaskCombo"],
+        id: json["id"],
+        done: json["done"]);
   }
 }
 

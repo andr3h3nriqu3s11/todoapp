@@ -63,6 +63,7 @@ class _MyHomePageState extends State<MyHomePage> {
   //  Tasks:
   List<TaskGenerator> taskGenerators = [];
   List<Task> tasks = [];
+  List<Task> ghostTasks = [];
   Tuple<int, Task>? lastTaskDone;
 
   //Set up Load Database
@@ -91,9 +92,47 @@ class _MyHomePageState extends State<MyHomePage> {
       });
     }
 
+    if (await store!.record('tasks').exists(db!)) {
+      var tempTasks =
+          (await store!.record('tasks').get(db!) as List<Map<String, dynamic>>)
+              .map((e) => Task.fromJson(e))
+              .toList();
+      setState(() {
+        tasks = tempTasks;
+      });
+    } else {
+      setState(() {
+        tasks = [];
+      });
+    }
+
+    if (await store!.record('tasksGenerators').exists(db!)) {
+      var tempTaskGenerators = (await store!.record('tasksGenerators').get(db!)
+              as List<Map<String, dynamic>>)
+          .map((e) => TaskGenerator.fromJson(e))
+          .toList();
+      setState(() {
+        taskGenerators = tempTaskGenerators;
+      });
+    } else {
+      setState(() {
+        taskGenerators = [];
+      });
+    }
+
     setState(() {
       loaded = true;
     });
+  }
+
+  Future saveDb() async {
+    //TODO: improve
+    if (store == null || db == null) return;
+    await store!.record('profile').put(db!, profile!.toJson());
+    await store!.record('tasks').put(db!, tasks.map((e) => e.toJSON()));
+    await store!
+        .record('tasksGenerators')
+        .put(db!, taskGenerators.map((e) => e.toJson()));
   }
 
   @override
@@ -162,6 +201,7 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       }
     }
+    saveDb();
   }
 
   void _newItemPage(BuildContext context) {
@@ -181,15 +221,22 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void generateTasks() {
     List<TaskGenerator> t = [];
+    List<Task> ghostTasksNew = [];
     for (var a in taskGenerators) {
-      tasks.add(a.type.generate(a.base, tasks));
+      var generated = a.type.generate(a.base, tasks);
+      if (generated != null) tasks.add(generated);
+      var generatedGhost = a.type.generateGhostTask(a.base, tasks);
+      if (generatedGhost != null) ghostTasksNew.add(generatedGhost);
+
       if (!a.type.finished()) t.add(a);
     }
     setState(() {
       taskGenerators = t;
+      ghostTasks = ghostTasksNew;
     });
     localNotification.cancelAll();
     checkTasks();
+    saveDb();
   }
 
   //! Note: When removing from fail only change to task.done to false
@@ -216,6 +263,7 @@ class _MyHomePageState extends State<MyHomePage> {
             lastTaskDone = null;
           }
         });
+        saveDb();
         return;
       }
 
@@ -251,6 +299,7 @@ class _MyHomePageState extends State<MyHomePage> {
         }
         tasks[index] = task;
       });
+      saveDb();
     };
   }
 
@@ -287,6 +336,17 @@ class _MyHomePageState extends State<MyHomePage> {
         .map((t) => TaskWidget(task: t.t, taskChanged: taskChanged(t.k)))
         .toList();
 
+    //Create Widgets out of it
+    //TODO: improve
+    //TODO: Add the rigth function with taskChanged to disable the task generator
+    List<Widget> taskGhost = tasks
+        .where((Task t) => !t.done)
+        .map((t) => TaskWidget(
+              task: t,
+              taskChanged: (Task _) {},
+            ))
+        .toList();
+
     // Return content for the page
     return Column(children: [
       SizedBox(height: 40),
@@ -294,6 +354,36 @@ class _MyHomePageState extends State<MyHomePage> {
           child: Column(
         children: taskWidgets,
       )),
+      if (taskGhost.length == 0)
+        SizedBox(
+          height: 0,
+        )
+      else
+        Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                    child: Container(
+                  decoration: BoxDecoration(color: Colors.white, boxShadow: [
+                    BoxShadow(
+                        color: Colors.grey,
+                        blurRadius: 10,
+                        offset: Offset(0, 3))
+                  ]),
+                  child: Padding(
+                    child: Text('Last task done'),
+                    padding: EdgeInsets.symmetric(vertical: 8)
+                        .add(EdgeInsets.only(left: 10)),
+                  ),
+                )),
+              ],
+            ),
+            ...taskGhost
+          ],
+        ),
+
+      //Last task Done
       if (lastTaskDone == null)
         SizedBox(height: 0)
       else
@@ -361,6 +451,8 @@ class _MyHomePageState extends State<MyHomePage> {
                         this.profile =
                             Profile(level: 0, xp: 0, money: 0, name: '');
                         this.store!.record('profile').delete(this.db!);
+                        this.store!.record('taks').delete(this.db!);
+                        this.store!.record('taskGenerators').delete(this.db!);
                         isProfileCreated = false;
                         tasks = [];
                       });
