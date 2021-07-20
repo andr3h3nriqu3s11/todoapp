@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 
+//TODO: Improve a lot
 class ProfileWidget extends StatelessWidget {
   const ProfileWidget({Key? key, required this.profile, required this.logOut})
       : super(key: key);

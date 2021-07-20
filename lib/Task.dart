@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class Task {
   Task(
@@ -180,6 +181,9 @@ class TaskTypeOnce extends TaskType {
     newTask.money = this.moneyPerTask;
     newTask.xpLost = this.xpLost;
     newTask.moneyLost = this.moneyLost;
+    if (this.date.isBefore(DateTime.now())) {
+      newTask.userRemovedFromFail = true;
+    }
     return newTask;
   }
 
@@ -201,7 +205,7 @@ class TaskTypeOnce extends TaskType {
         "xpPerTask": this.xpPerTask,
         "xpLost": this.xpLost,
         "xpPerTaskCombo": this.xpPerTaskCombo,
-        "moneyList": this.moneyLost,
+        "moneyLost": this.moneyLost,
         "moneyPerTask": this.moneyPerTask,
         "moneyPerTaskCombo": this.moneyPerTaskCombo,
         "done": this.done,
@@ -212,6 +216,7 @@ class TaskTypeOnce extends TaskType {
   }
 
   factory TaskTypeOnce.fromJson(Map<String, dynamic> json) {
+    print(json);
     return TaskTypeOnce(
         date: DateTime.tryParse(json["date"])!,
         moneyLost: json["moneyLost"],
@@ -267,7 +272,8 @@ class TaskTypeRepeatEveryDay extends TaskType {
     });
 
     DateTime today = DateTime.now();
-    if (today.year == lastTask!.date!.year &&
+    if (lastTask != null &&
+        today.year == lastTask!.date!.year &&
         today.month == lastTask!.date!.month &&
         today.day == lastTask!.date!.day) return null;
 
@@ -281,6 +287,9 @@ class TaskTypeRepeatEveryDay extends TaskType {
     newTask.money = this.moneyPerTask;
     newTask.xpLost = this.xpLost;
     newTask.moneyLost = this.moneyLost;
+    if (newTask.date!.isBefore(DateTime.now())) {
+      newTask.userRemovedFromFail = true;
+    }
     return newTask;
   }
 
@@ -333,7 +342,7 @@ class TaskTypeRepeatEveryDay extends TaskType {
         "xpPerTask": this.xpPerTask,
         "xpLost": this.xpLost,
         "xpPerTaskCombo": this.xpPerTaskCombo,
-        "moneyList": this.moneyLost,
+        "moneyLost": this.moneyLost,
         "moneyPerTask": this.moneyPerTask,
         "moneyPerTaskCombo": this.moneyPerTaskCombo,
         "done": this.done,
@@ -358,8 +367,13 @@ class TaskTypeRepeatEveryDay extends TaskType {
 }
 
 class TaskWidget extends StatelessWidget {
-  const TaskWidget({Key? key, required this.task, required this.taskChanged})
+  const TaskWidget(
+      {Key? key,
+      required this.task,
+      this.ghost = false,
+      required this.taskChanged})
       : super(key: key);
+  final bool ghost;
   final Task task;
   final ValueChanged<Task> taskChanged;
 
@@ -388,6 +402,32 @@ class TaskWidget extends StatelessWidget {
       taskChanged(a);
     };
 
+    String date = ghost ? "Available " : '';
+    var f = NumberFormat("00");
+
+    if (isTheSameDay(task.date!, DateTime.now())) {
+      date += "Today " +
+          task.date!.hour.toString() +
+          " : " +
+          f.format(task.date!.minute);
+    } else if (isTheSameDay(
+        task.date!, DateTime.now().add(Duration(hours: 24)))) {
+      date += "Tomorow " +
+          task.date!.hour.toString() +
+          " : " +
+          f.format(task.date!.minute);
+    } else {
+      date += f.format(task.date!.day) +
+          "/" +
+          f.format(task.date!.month) +
+          "/" +
+          f.format(task.date!.year) +
+          " " +
+          task.date!.hour.toString() +
+          " : " +
+          f.format(task.date!.minute);
+    }
+
     return Container(
         color: Color.fromARGB(255, 226, 226, 226),
         width: double.infinity,
@@ -397,7 +437,7 @@ class TaskWidget extends StatelessWidget {
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [Text(task.date.toString())],
+                  children: [Text(date)],
                 ),
                 Padding(
                   padding: const EdgeInsets.all(3.0),
@@ -420,6 +460,12 @@ class TaskWidget extends StatelessWidget {
               ],
             )));
   }
+}
+
+bool isTheSameDay(DateTime time1, DateTime time2) {
+  return time1.day == time2.day &&
+      time1.month == time2.month &&
+      time1.year == time2.year;
 }
 
 class TaskWidgetIcon extends StatelessWidget {

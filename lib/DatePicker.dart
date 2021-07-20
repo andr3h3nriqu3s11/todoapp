@@ -8,8 +8,10 @@ class DatePicker extends StatelessWidget {
       required this.selectTime,
       required this.selectedDate,
       required this.selectedTime,
+      required this.timeOnly,
       required this.labelText})
       : super(key: key);
+  final bool timeOnly;
   final String labelText;
   final DateTime selectedDate;
   final TimeOfDay selectedTime;
@@ -44,17 +46,18 @@ class DatePicker extends StatelessWidget {
     return new Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: <Widget>[
-        Expanded(
-          flex: 4,
-          child: new _InputDropdown(
-            labelText: labelText,
-            valueText: date,
-            onPressed: () {
-              _selectDate(context);
-            },
+        if (!this.timeOnly)
+          Expanded(
+            flex: 4,
+            child: new _InputDropdown(
+              labelText: labelText,
+              valueText: date,
+              onPressed: () {
+                _selectDate(context);
+              },
+            ),
           ),
-        ),
-        const SizedBox(width: 12.0),
+        if (!this.timeOnly) const SizedBox(width: 12.0),
         new Expanded(
           flex: 3,
           child: new _InputDropdown(
@@ -64,6 +67,7 @@ class DatePicker extends StatelessWidget {
             },
           ),
         ),
+        const SizedBox(width: 0.0),
       ],
     );
   }

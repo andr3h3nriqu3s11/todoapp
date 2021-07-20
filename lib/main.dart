@@ -93,13 +93,21 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     if (await store!.record('tasks').exists(db!)) {
-      var tempTasks =
-          (await store!.record('tasks').get(db!) as List<Map<String, dynamic>>)
-              .map((e) => Task.fromJson(e))
-              .toList();
-      setState(() {
-        tasks = tempTasks;
-      });
+      try {
+        List<Task> tempTasks = (await store!.record('tasks').get(db!))
+            .map((e) => Task.fromJson(e))
+            .toList();
+        setState(() {
+          tasks = tempTasks;
+        });
+      } catch (e) {
+        print("Failed to provess tasks: " + e.toString());
+        //TODO: Deal with error waring
+        await store!.record('tasks').delete(db!);
+        //TODO: improve
+        startDb();
+        return;
+      }
     } else {
       setState(() {
         tasks = [];
@@ -107,13 +115,22 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     if (await store!.record('tasksGenerators').exists(db!)) {
-      var tempTaskGenerators = (await store!.record('tasksGenerators').get(db!)
-              as List<Map<String, dynamic>>)
-          .map((e) => TaskGenerator.fromJson(e))
-          .toList();
-      setState(() {
-        taskGenerators = tempTaskGenerators;
-      });
+      try {
+        List<TaskGenerator> tempTaskGenerators =
+            (await store!.record('tasksGenerators').get(db!))
+                .map((e) => TaskGenerator.fromJson(e))
+                .toList();
+        setState(() {
+          taskGenerators = tempTaskGenerators;
+        });
+      } catch (e) {
+        print("Failed to provess tasks generators: " + e.toString());
+        //TODO: Deal with error waring
+        await store!.record('tasksGenerators').delete(db!);
+        //TODO: improve
+        startDb();
+        return;
+      }
     } else {
       setState(() {
         taskGenerators = [];
@@ -127,12 +144,15 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future saveDb() async {
     //TODO: improve
+    // probably had a tost
     if (store == null || db == null) return;
     await store!.record('profile').put(db!, profile!.toJson());
-    await store!.record('tasks').put(db!, tasks.map((e) => e.toJSON()));
+    await store!
+        .record('tasks')
+        .put(db!, tasks.map((e) => e.toJSON()).toList());
     await store!
         .record('tasksGenerators')
-        .put(db!, taskGenerators.map((e) => e.toJson()));
+        .put(db!, taskGenerators.map((e) => e.toJson()).toList());
   }
 
   @override
@@ -158,6 +178,7 @@ class _MyHomePageState extends State<MyHomePage> {
     checkTasks();
   }
 
+  //! Note: This function saves the db
   Future checkTasks() async {
     tz.Location location =
         tz.getLocation(await FlutterNativeTimezone.getLocalTimezone());
@@ -170,13 +191,14 @@ class _MyHomePageState extends State<MyHomePage> {
           //Check the task
           //If the task is already past the time and was not recoverd by the user
           // then marked it as failed
-          if (task.date!.isBefore(DateTime.now()) &&
-              !task.userRemovedFromFail) {
-            task.done = true;
-            task.fail = true;
-            task.directToFail = true;
-            //Call the task changed function to deal with the points
-            taskChanged(index)(task);
+          if (task.date!.isBefore(DateTime.now())) {
+            if (!task.userRemovedFromFail) {
+              task.done = true;
+              task.fail = true;
+              task.directToFail = true;
+              //Call the task changed function to deal with the points
+              taskChanged(index)(task);
+            }
           } else if (task.date!
               .subtract(Duration(minutes: 15))
               .isBefore(DateTime.now())) {
@@ -223,9 +245,12 @@ class _MyHomePageState extends State<MyHomePage> {
     List<TaskGenerator> t = [];
     List<Task> ghostTasksNew = [];
     for (var a in taskGenerators) {
+      print(a.toJson());
       var generated = a.type.generate(a.base, tasks);
+      print(generated);
       if (generated != null) tasks.add(generated);
       var generatedGhost = a.type.generateGhostTask(a.base, tasks);
+      print(generatedGhost);
       if (generatedGhost != null) ghostTasksNew.add(generatedGhost);
 
       if (!a.type.finished()) t.add(a);
@@ -236,13 +261,12 @@ class _MyHomePageState extends State<MyHomePage> {
     });
     localNotification.cancelAll();
     checkTasks();
-    saveDb();
   }
 
   //! Note: When removing from fail only change to task.done to false
+  //! Note: This function saves the db
   taskChanged(int index) {
     return (Task task) {
-      print(task);
       // something -> Fail -> not done
       // The xp points and the money need to be restored
       // something is defined by the directToFail if its true
@@ -287,7 +311,8 @@ class _MyHomePageState extends State<MyHomePage> {
           this.profile!.money += task.money;
           lastTaskDone = Tuple(k: index, t: task);
           task.taskAddedPoints = true;
-        } else if (lastTaskDone != null && lastTaskDone!.k == index) {
+        }
+        if (lastTaskDone != null && lastTaskDone!.k == index && !task.done) {
           lastTaskDone = null;
         }
 
@@ -339,9 +364,10 @@ class _MyHomePageState extends State<MyHomePage> {
     //Create Widgets out of it
     //TODO: improve
     //TODO: Add the rigth function with taskChanged to disable the task generator
-    List<Widget> taskGhost = tasks
+    List<Widget> taskGhost = ghostTasks
         .where((Task t) => !t.done)
         .map((t) => TaskWidget(
+              ghost: true,
               task: t,
               taskChanged: (Task _) {},
             ))
@@ -372,7 +398,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         offset: Offset(0, 3))
                   ]),
                   child: Padding(
-                    child: Text('Last task done'),
+                    child: Text('Next Tasks'),
                     padding: EdgeInsets.symmetric(vertical: 8)
                         .add(EdgeInsets.only(left: 10)),
                   ),

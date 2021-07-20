@@ -64,10 +64,10 @@ class _EditNewItemState extends State<EditNewItem> {
     Task t = Task(title: _name, id: new Random().nextInt(100000).floor());
     TaskType? taskType;
     if (_taskTypeValue == 1) {
-      //TODO: Change id
       taskType = TaskTypeOnce(
           date: DateTime(_onceDate.year, _onceDate.month, _onceDate.day,
               _onceTime.hour, _onceTime.minute, 0, 0, 0),
+          //TODO: Change id
           id: new Random().nextInt(100000).floor(),
           xpPerTaskCombo: this.xpPerTaskCombo,
           xpLost: this.xpLost,
@@ -75,6 +75,18 @@ class _EditNewItemState extends State<EditNewItem> {
           moneyLost: this.moneyLost,
           moneyPerTask: this.moneyPerTask,
           moneyPerTaskCombo: this.moneyPerTaskCombo);
+    } else if (_taskTypeValue == 2) {
+      taskType = TaskTypeRepeatEveryDay(
+        xpPerTask: this.xpPerTask,
+        xpPerTaskCombo: this.xpPerTaskCombo,
+        moneyPerTask: this.moneyPerTask,
+        moneyPerTaskCombo: this.moneyPerTaskCombo,
+        xpLost: this.xpLost,
+        moneyLost: this.moneyLost,
+        date: DateTime(2020, 1, 1, _onceTime.hour, _onceTime.minute),
+        //TODO: Change id
+        id: new Random().nextInt(100000).floor(),
+      );
     } else
       return null;
 
@@ -104,7 +116,7 @@ class _EditNewItemState extends State<EditNewItem> {
   Widget _buildTypeSelector() {
     int index = 1;
 
-    List<String> itemsText = ["Do until"];
+    List<String> itemsText = ["Do until", "Repeat every day"];
 
     List<DropdownMenuItem<int>> items =
         itemsText.map<DropdownMenuItem<int>>((String title) {
@@ -130,9 +142,10 @@ class _EditNewItemState extends State<EditNewItem> {
     );
   }
 
-  Widget _buildDateSelector() {
+  Widget _buildDateSelector({bool timeonly: false}) {
     return DatePicker(
       labelText: 'Time of the task',
+      timeOnly: timeonly,
       selectedDate: _onceDate,
       selectedTime: _onceTime,
       selectDate: (DateTime? time) {
@@ -328,6 +341,8 @@ class _EditNewItemState extends State<EditNewItem> {
                       _buildTitle(),
                       _buildTypeSelector(),
                       if (_taskTypeValue == 1) _buildDateSelector(),
+                      if (_taskTypeValue == 2)
+                        _buildDateSelector(timeonly: true),
                     ],
                   ),
                 ),
