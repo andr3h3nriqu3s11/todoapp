@@ -94,14 +94,15 @@ class _MyHomePageState extends State<MyHomePage> {
 
     if (await store!.record('tasks').exists(db!)) {
       try {
-        List<Task> tempTasks = (await store!.record('tasks').get(db!))
-            .map((e) => Task.fromJson(e))
-            .toList();
+        List<Task> tempTasks =
+            (((await store!.record('tasks').get(db!)) as List<dynamic>)
+                .map((e) => Task.fromJson(e))
+                .toList());
         setState(() {
           tasks = tempTasks;
         });
       } catch (e) {
-        print("Failed to provess tasks: " + e.toString());
+        print("Failed to process tasks: " + e.toString());
         //TODO: Deal with error waring
         await store!.record('tasks').delete(db!);
         //TODO: improve
@@ -116,15 +117,16 @@ class _MyHomePageState extends State<MyHomePage> {
 
     if (await store!.record('tasksGenerators').exists(db!)) {
       try {
-        List<TaskGenerator> tempTaskGenerators =
-            (await store!.record('tasksGenerators').get(db!))
-                .map((e) => TaskGenerator.fromJson(e))
-                .toList();
+        List<TaskGenerator> tempTaskGenerators = (((await store!
+                .record('tasksGenerators')
+                .get(db!)) as List<dynamic>)
+            .map((e) => TaskGenerator.fromJson(e))
+            .toList());
         setState(() {
           taskGenerators = tempTaskGenerators;
         });
       } catch (e) {
-        print("Failed to provess tasks generators: " + e.toString());
+        print("Failed to process tasks generators: " + e.toString());
         //TODO: Deal with error waring
         await store!.record('tasksGenerators').delete(db!);
         //TODO: improve
@@ -245,12 +247,9 @@ class _MyHomePageState extends State<MyHomePage> {
     List<TaskGenerator> t = [];
     List<Task> ghostTasksNew = [];
     for (var a in taskGenerators) {
-      print(a.toJson());
       var generated = a.type.generate(a.base, tasks);
-      print(generated);
       if (generated != null) tasks.add(generated);
       var generatedGhost = a.type.generateGhostTask(a.base, tasks);
-      print(generatedGhost);
       if (generatedGhost != null) ghostTasksNew.add(generatedGhost);
 
       if (!a.type.finished()) t.add(a);
@@ -333,9 +332,17 @@ class _MyHomePageState extends State<MyHomePage> {
     int index = 0;
 
     //Create Widgets out of it
-    List<Widget> taskWidgets = tasks
-        .map((Task e) => Tuple(k: index, t: e))
+    List<Tuple<int, Task>> taskTuples = tasks
+        .map((Task e) => Tuple(k: index++, t: e))
         .where((Tuple t) => t.t.done)
+        .toList();
+    taskTuples.sort((a, b) {
+      if (a.t.date == null && b.t.date == null) return 0;
+      if (a.t.date == null) return -1;
+      if (b.t.date == null) return 1;
+      return a.t.date!.compareTo(b.t.date!);
+    });
+    List<Widget> taskWidgets = taskTuples
         .map((t) => TaskWidget(task: t.t, taskChanged: taskChanged(t.k)))
         .toList();
 
@@ -355,9 +362,17 @@ class _MyHomePageState extends State<MyHomePage> {
     int index = 0;
 
     //Create Widgets out of it
-    List<Widget> taskWidgets = tasks
-        .map((Task e) => Tuple(k: index, t: e))
+    List<Tuple<int, Task>> taskTuples = tasks
+        .map((Task e) => Tuple(k: index++, t: e))
         .where((Tuple t) => !t.t.done)
+        .toList();
+    taskTuples.sort((a, b) {
+      if (a.t.date == null && b.t.date == null) return 0;
+      if (a.t.date == null) return -1;
+      if (b.t.date == null) return 1;
+      return a.t.date!.compareTo(b.t.date!);
+    });
+    List<Widget> taskWidgets = taskTuples
         .map((t) => TaskWidget(task: t.t, taskChanged: taskChanged(t.k)))
         .toList();
 
@@ -481,6 +496,8 @@ class _MyHomePageState extends State<MyHomePage> {
                         this.store!.record('taskGenerators').delete(this.db!);
                         isProfileCreated = false;
                         tasks = [];
+                        taskGenerators = [];
+                        lastTaskDone = null;
                       });
                     },
                   ),
