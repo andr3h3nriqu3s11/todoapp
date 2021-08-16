@@ -141,12 +141,14 @@ class _MyHomePageState extends State<MyHomePage> {
 
     setState(() {
       loaded = true;
+      generateTasks();
+      checkTasks();
     });
   }
 
   Future saveDb() async {
     //TODO: improve
-    // probably had a tost
+    // probably add a tost
     if (store == null || db == null) return;
     await store!.record('profile').put(db!, profile!.toJson());
     await store!
@@ -177,7 +179,6 @@ class _MyHomePageState extends State<MyHomePage> {
     generalNotificationDetails =
         new NotificationDetails(android: androidDetail, iOS: iosDetails);
     initializeTimeZones();
-    checkTasks();
   }
 
   //! Note: This function saves the db
@@ -243,6 +244,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 )));
   }
 
+  //! Note: this function calls a function that saves the db
   void generateTasks() {
     List<TaskGenerator> t = [];
     List<Task> ghostTasksNew = [];
@@ -286,7 +288,7 @@ class _MyHomePageState extends State<MyHomePage> {
             lastTaskDone = null;
           }
         });
-        saveDb();
+        generateTasks();
         return;
       }
 
@@ -323,7 +325,7 @@ class _MyHomePageState extends State<MyHomePage> {
         }
         tasks[index] = task;
       });
-      saveDb();
+      generateTasks();
     };
   }
 
@@ -338,9 +340,9 @@ class _MyHomePageState extends State<MyHomePage> {
         .toList();
     taskTuples.sort((a, b) {
       if (a.t.date == null && b.t.date == null) return 0;
-      if (a.t.date == null) return -1;
-      if (b.t.date == null) return 1;
-      return a.t.date!.compareTo(b.t.date!);
+      if (a.t.date == null) return 1;
+      if (b.t.date == null) return -1;
+      return b.t.date!.compareTo(a.t.date!);
     });
     List<Widget> taskWidgets = taskTuples
         .map((t) => TaskWidget(task: t.t, taskChanged: taskChanged(t.k)))
@@ -350,8 +352,10 @@ class _MyHomePageState extends State<MyHomePage> {
     return Column(children: [
       SizedBox(height: 40),
       Expanded(
-          child: Column(
-        children: taskWidgets,
+          child: SingleChildScrollView(
+        child: Column(
+          children: taskWidgets,
+        ),
       )),
       SizedBox(height: 0)
     ]);
@@ -379,6 +383,12 @@ class _MyHomePageState extends State<MyHomePage> {
     //Create Widgets out of it
     //TODO: improve
     //TODO: Add the rigth function with taskChanged to disable the task generator
+    ghostTasks.sort((a, b) {
+      if (a.date == null && b.date == null) return 0;
+      if (a.date == null) return -1;
+      if (b.date == null) return 1;
+      return a.date!.compareTo(b.date!);
+    });
     List<Widget> taskGhost = ghostTasks
         .where((Task t) => !t.done)
         .map((t) => TaskWidget(
@@ -392,36 +402,44 @@ class _MyHomePageState extends State<MyHomePage> {
     return Column(children: [
       SizedBox(height: 40),
       Expanded(
-          child: Column(
-        children: taskWidgets,
-      )),
+        child: SingleChildScrollView(
+          child: Column(children: taskWidgets),
+        ),
+      ),
       if (taskGhost.length == 0)
         SizedBox(
           height: 0,
         )
       else
-        Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                    child: Container(
-                  decoration: BoxDecoration(color: Colors.white, boxShadow: [
-                    BoxShadow(
-                        color: Colors.grey,
-                        blurRadius: 10,
-                        offset: Offset(0, 3))
-                  ]),
-                  child: Padding(
-                    child: Text('Next Tasks'),
-                    padding: EdgeInsets.symmetric(vertical: 8)
-                        .add(EdgeInsets.only(left: 10)),
-                  ),
-                )),
-              ],
-            ),
-            ...taskGhost
-          ],
+        SizedBox(
+          height: (92 * (taskGhost.length > 3 ? 3 : taskGhost.length)) + 35,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                      child: Container(
+                    decoration: BoxDecoration(color: Colors.white, boxShadow: [
+                      BoxShadow(
+                          color: Colors.grey,
+                          blurRadius: 10,
+                          offset: Offset(0, 3))
+                    ]),
+                    child: Padding(
+                      child: Text('Next Tasks'),
+                      padding: EdgeInsets.symmetric(vertical: 8)
+                          .add(EdgeInsets.only(left: 10)),
+                    ),
+                  )),
+                ],
+              ),
+              Expanded(
+                  child: SingleChildScrollView(
+                      child: Column(
+                children: taskGhost,
+              )))
+            ],
+          ),
         ),
 
       //Last task Done
@@ -497,6 +515,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         isProfileCreated = false;
                         tasks = [];
                         taskGenerators = [];
+                        ghostTasks = [];
                         lastTaskDone = null;
                       });
                     },

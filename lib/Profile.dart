@@ -15,11 +15,15 @@ class ProfileWidget extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
         SizedBox(
-          height: 50,
+          height: 60,
         ),
         Row(
           children: [
-            Expanded(child: Text(profile.name)),
+            Expanded(
+                child: Text(
+              profile.name,
+              style: TextStyle(fontSize: 30),
+            )),
             Text("Lv:" + profile.level.toString())
           ],
         ),
@@ -27,6 +31,7 @@ class ProfileWidget extends StatelessWidget {
         LinearProgressIndicator(
           value: profile.xp / profile.getLevelXp(),
         ),
+        Text('Money: ${profile.money}'),
         ElevatedButton(onPressed: logOut, child: Text('Logout'))
       ],
     );

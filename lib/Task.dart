@@ -260,7 +260,9 @@ class TaskTypeRepeatEveryDay extends TaskType {
     Task? lastTask;
 
     oldTasks
-        .where((element) => element.taskType is TaskTypeRepeatEveryDay)
+        .where((element) =>
+            (element.taskType is TaskTypeRepeatEveryDay) &&
+            element.id == this.id)
         .forEach((element) {
       if (lastTask == null && element.date != null) {
         lastTask = element;
@@ -305,19 +307,22 @@ class TaskTypeRepeatEveryDay extends TaskType {
     oldTasks
         .where((element) => element.taskType is TaskTypeRepeatEveryDay)
         .forEach((element) {
-      if (lastTask == null && element.date != null) {
+      if (lastTask == null && element.date != null && element.id == this.id) {
         lastTask = element;
       } else if (lastTask != null &&
           element.date != null &&
-          lastTask!.date!.isBefore(element.date!)) {
+          lastTask!.date!.isBefore(element.date!) &&
+          element.id == this.id) {
         lastTask = element;
       }
     });
 
     DateTime today = DateTime.now();
-    if (today.year != lastTask!.date!.year ||
-        today.month != lastTask!.date!.month ||
-        today.day != lastTask!.date!.day) return null;
+    if (lastTask == null ||
+        (today.year == lastTask!.date!.year &&
+            today.month == lastTask!.date!.month &&
+            today.day == lastTask!.date!.day &&
+            !lastTask!.done)) return null;
 
     DateTime tomorrow = DateTime.now().add(Duration(hours: 24));
 
