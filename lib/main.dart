@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:app/EditNewItem.dart';
 import 'package:app/Profile.dart';
 import 'package:app/Start.dart';
@@ -63,8 +65,9 @@ class _MyHomePageState extends State<MyHomePage> {
   //  Tasks:
   List<TaskGenerator> taskGenerators = [];
   List<Task> tasks = [];
-  List<Task> ghostTasks = [];
+  List<Tuple<Task, TaskGenerator>> ghostTasks = [];
   Tuple<int, Task>? lastTaskDone;
+  Tuple<TaskGenerator, Offset>? dragTaskGenerator;
 
   //Set up Load Database
   Future startDb() async {
@@ -247,12 +250,13 @@ class _MyHomePageState extends State<MyHomePage> {
   //! Note: this function calls a function that saves the db
   void generateTasks() {
     List<TaskGenerator> t = [];
-    List<Task> ghostTasksNew = [];
+    List<Tuple<Task, TaskGenerator>> ghostTasksNew = [];
     for (var a in taskGenerators) {
       var generated = a.type.generate(a.base, tasks);
       if (generated != null) tasks.add(generated);
       var generatedGhost = a.type.generateGhostTask(a.base, tasks);
-      if (generatedGhost != null) ghostTasksNew.add(generatedGhost);
+      if (generatedGhost != null)
+        ghostTasksNew.add(Tuple(k: generatedGhost, t: a));
 
       if (!a.type.finished()) t.add(a);
     }
@@ -384,18 +388,35 @@ class _MyHomePageState extends State<MyHomePage> {
     //TODO: improve
     //TODO: Add the rigth function with taskChanged to disable the task generator
     ghostTasks.sort((a, b) {
-      if (a.date == null && b.date == null) return 0;
-      if (a.date == null) return -1;
-      if (b.date == null) return 1;
-      return a.date!.compareTo(b.date!);
+      if (a.k.date == null && b.k.date == null) return 0;
+      if (a.k.date == null) return -1;
+      if (b.k.date == null) return 1;
+      return a.k.date!.compareTo(b.k.date!);
     });
     List<Widget> taskGhost = ghostTasks
-        .where((Task t) => !t.done)
-        .map((t) => TaskWidget(
+        .where((var t) => !t.k.done)
+        .map((t) => GestureDetector(
+            onHorizontalDragStart: (DragStartDetails e) {
+              dragTaskGenerator = Tuple(k: t.t, t: e.globalPosition);
+            },
+            onHorizontalDragUpdate: (DragUpdateDetails e) {
+              if (dragTaskGenerator != null &&
+                  dragTaskGenerator!.k.base.id == t.k.id) {
+                //TODO drag animation
+              }
+            },
+            onHorizontalDragEnd: (DragEndDetails e) {
+              if (dragTaskGenerator != null &&
+                  dragTaskGenerator!.k.base.id == t.k.id) {
+                //TODO drag action
+                print('Drag end Edit');
+              }
+            },
+            child: TaskWidget(
               ghost: true,
-              task: t,
+              task: t.k,
               taskChanged: (Task _) {},
-            ))
+            )))
         .toList();
 
     // Return content for the page
@@ -412,7 +433,7 @@ class _MyHomePageState extends State<MyHomePage> {
         )
       else
         SizedBox(
-          height: (92 * (taskGhost.length > 3 ? 3 : taskGhost.length)) + 35,
+          height: (92 * min(taskGhost.length, 2)) + 35,
           child: Column(
             children: [
               Row(

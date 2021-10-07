@@ -411,10 +411,14 @@ class TaskWidget extends StatelessWidget {
     var f = NumberFormat("00");
 
     if (isTheSameDay(task.date!, DateTime.now())) {
-      date += "Today " +
-          task.date!.hour.toString() +
-          " : " +
-          f.format(task.date!.minute);
+      if (task.date!.hour == 23 && task.date!.minute == 59) {
+        date += "Until the end Today";
+      } else {
+        date += "Today " +
+            task.date!.hour.toString() +
+            " : " +
+            f.format(task.date!.minute);
+      }
     } else if (isTheSameDay(
         task.date!, DateTime.now().add(Duration(hours: 24)))) {
       date += "Tomorow " +
