@@ -248,6 +248,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   //! Note: this function calls a function that saves the db
+  //! Note: this function calls the checkTasks function
   void generateTasks() {
     List<TaskGenerator> t = [];
     List<Tuple<Task, TaskGenerator>> ghostTasksNew = [];
@@ -365,7 +366,7 @@ class _MyHomePageState extends State<MyHomePage> {
     ]);
   }
 
-  Widget _buildToDoTask() {
+  Widget _buildToDoTask(BuildContext context) {
     //Get rigth taks
     int index = 0;
 
@@ -393,6 +394,7 @@ class _MyHomePageState extends State<MyHomePage> {
       if (b.k.date == null) return 1;
       return a.k.date!.compareTo(b.k.date!);
     });
+
     List<Widget> taskGhost = ghostTasks
         .where((var t) => !t.k.done)
         .map((t) => GestureDetector(
@@ -409,13 +411,26 @@ class _MyHomePageState extends State<MyHomePage> {
               if (dragTaskGenerator != null &&
                   dragTaskGenerator!.k.base.id == t.k.id) {
                 //TODO drag action
-                print('Drag end Edit');
               }
             },
             child: TaskWidget(
               ghost: true,
               task: t.k,
-              taskChanged: (Task _) {},
+              taskChanged: (Task tas) {
+                print("${tas.fail} ${tas.directToFail}");
+                if (tas.fail) {
+                  print("showAlert");
+                  showAlertDialog(
+                      context,
+                      "Do you want to remove ${tas.title}?",
+                      "Are you sure?", () {
+                    taskGenerators.remove(t.t);
+                    ghostTasks.remove(t.k);
+                    //Note no need to save the db as this function will save the db
+                    generateTasks();
+                  }, () {});
+                }
+              },
             )))
         .toList();
 
@@ -520,7 +535,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       body: Center(
         child: _selectedIndex == 0
-            ? _buildToDoTask()
+            ? _buildToDoTask(context)
             : _selectedIndex == 1
                 ? _buildDoneTask()
                 : ProfileWidget(

@@ -386,11 +386,26 @@ class TaskWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     var onPressed = () {
       var a = task;
+      //Treat if this is a ghost list item then it works diferently. A simple tap
+      //Will mark task as done
+      if (ghost) {
+        a.done = true;
+        taskChanged(a);
+        return;
+      }
       a.done = !a.done;
       taskChanged(a);
     };
     var onLongPress = () {
       var a = task;
+      //Treat if this is a ghost list item then it works diferently. A long tap
+      //Will mark task as fail
+      if (ghost) {
+        a.fail = true;
+        taskChanged(a);
+        return;
+      }
+
       if (!a.done) {
         //Because its going from not done -> fail
         a.directToFail = true;
