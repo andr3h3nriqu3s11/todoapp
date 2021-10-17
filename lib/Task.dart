@@ -425,31 +425,27 @@ class TaskWidget extends StatelessWidget {
     String date = ghost ? "Available " : '';
     var f = NumberFormat("00");
 
+    var sDate = !ghost;
+
     if (isTheSameDay(task.date!, DateTime.now())) {
       if (task.date!.hour == 23 && task.date!.minute == 59) {
         date += "Until the end Today";
+        sDate = false;
       } else {
-        date += "Today " +
-            task.date!.hour.toString() +
-            " : " +
-            f.format(task.date!.minute);
+        date += "Today ";
       }
     } else if (isTheSameDay(
         task.date!, DateTime.now().add(Duration(hours: 24)))) {
-      date += "Tomorow " +
-          task.date!.hour.toString() +
-          " : " +
-          f.format(task.date!.minute);
+      date += "Tomorow ";
     } else {
       date += f.format(task.date!.day) +
           "/" +
           f.format(task.date!.month) +
           "/" +
-          f.format(task.date!.year) +
-          " " +
-          task.date!.hour.toString() +
-          " : " +
-          f.format(task.date!.minute);
+          f.format(task.date!.year);
+    }
+    if (sDate) {
+      date += task.date!.hour.toString() + " : " + f.format(task.date!.minute);
     }
 
     return Container(

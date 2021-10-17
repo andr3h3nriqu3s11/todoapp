@@ -69,6 +69,10 @@ class _MyHomePageState extends State<MyHomePage> {
   Tuple<int, Task>? lastTaskDone;
   Tuple<TaskGenerator, Offset>? dragTaskGenerator;
 
+  // Secound Page limit
+  int limit = 0;
+  ScrollController? _scrollController = null;
+
   //Set up Load Database
   Future startDb() async {
     DatabaseFactory dbFactory = databaseFactoryIo;
@@ -165,8 +169,20 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    //Start db
-    startDb();
+
+    //This makes sure that the when the scroll on the second page
+    //reaches the end it loads more data
+    WidgetsBinding.instance?.addPostFrameCallback((_) async {
+      _scrollController = ScrollController();
+      _scrollController!.addListener(() {
+        if (_scrollController!.position.atEdge &&
+            _scrollController!.position.pixels != 0)
+          setState(() {
+            limit += 1;
+          });
+      });
+    });
+
     // Android default settings takes the icon name if the icon does not exist
     //on the drawable folder an error will be thrown
     var androidInitilize = new AndroidInitializationSettings("ic_launcher");
@@ -182,6 +198,9 @@ class _MyHomePageState extends State<MyHomePage> {
     generalNotificationDetails =
         new NotificationDetails(android: androidDetail, iOS: iosDetails);
     initializeTimeZones();
+
+    //This starts db and loads all the data from it
+    startDb();
   }
 
   //! Note: This function saves the db
@@ -334,6 +353,17 @@ class _MyHomePageState extends State<MyHomePage> {
     };
   }
 
+  void _changePage(int index) {
+    if (index == 1) {
+      setState(() {
+        limit = 1;
+      });
+    }
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
   Widget _buildDoneTask() {
     //Get rigth taks
     int index = 0;
@@ -342,6 +372,7 @@ class _MyHomePageState extends State<MyHomePage> {
     List<Tuple<int, Task>> taskTuples = tasks
         .map((Task e) => Tuple(k: index++, t: e))
         .where((Tuple t) => t.t.done)
+        .take(15 * limit)
         .toList();
     taskTuples.sort((a, b) {
       if (a.t.date == null && b.t.date == null) return 0;
@@ -358,6 +389,7 @@ class _MyHomePageState extends State<MyHomePage> {
       SizedBox(height: 40),
       Expanded(
           child: SingleChildScrollView(
+        controller: _scrollController,
         child: Column(
           children: taskWidgets,
         ),
@@ -568,11 +600,7 @@ class _MyHomePageState extends State<MyHomePage> {
               icon: const Icon(Icons.person), label: 'Profile'),
         ],
         currentIndex: _selectedIndex,
-        onTap: (int value) {
-          setState(() {
-            _selectedIndex = value;
-          });
-        },
+        onTap: _changePage,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _newItemPage(context),
