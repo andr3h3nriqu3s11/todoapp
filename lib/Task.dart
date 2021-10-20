@@ -445,7 +445,10 @@ class TaskWidget extends StatelessWidget {
           f.format(task.date!.year);
     }
     if (sDate) {
-      date += task.date!.hour.toString() + " : " + f.format(task.date!.minute);
+      date += " " +
+          task.date!.hour.toString() +
+          " : " +
+          f.format(task.date!.minute);
     }
 
     return Container(

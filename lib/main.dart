@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:app/BoxHolder.dart';
 import 'package:app/EditNewItem.dart';
 import 'package:app/Profile.dart';
 import 'package:app/Start.dart';
@@ -372,15 +373,22 @@ class _MyHomePageState extends State<MyHomePage> {
     List<Tuple<int, Task>> taskTuples = tasks
         .map((Task e) => Tuple(k: index++, t: e))
         .where((Tuple t) => t.t.done)
-        .take(15 * limit)
         .toList();
+
+    // Only takes from this month
+
     taskTuples.sort((a, b) {
       if (a.t.date == null && b.t.date == null) return 0;
       if (a.t.date == null) return 1;
       if (b.t.date == null) return -1;
       return b.t.date!.compareTo(a.t.date!);
     });
+
+    DateTime t = new DateTime.now();
+
     List<Widget> taskWidgets = taskTuples
+        .where((e) => e.t.date!.month >= t.month)
+        .take(15 * limit)
         .map((t) => TaskWidget(task: t.t, taskChanged: taskChanged(t.k)))
         .toList();
 
@@ -391,7 +399,14 @@ class _MyHomePageState extends State<MyHomePage> {
           child: SingleChildScrollView(
         controller: _scrollController,
         child: Column(
-          children: taskWidgets,
+          children: [
+            BoxHolder(
+              name: 'This month',
+              children: taskWidgets,
+              toggleable: true,
+              defaultActive: true,
+            )
+          ],
         ),
       )),
       SizedBox(height: 0)
