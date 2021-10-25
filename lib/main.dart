@@ -66,6 +66,7 @@ class _MyHomePageState extends State<MyHomePage> {
   //  Tasks:
   List<TaskGenerator> taskGenerators = [];
   List<Task> tasks = [];
+  List<Task> oldTasks = [];
   List<Tuple<Task, TaskGenerator>> ghostTasks = [];
   Tuple<int, Task>? lastTaskDone;
   Tuple<TaskGenerator, Offset>? dragTaskGenerator;
@@ -73,6 +74,24 @@ class _MyHomePageState extends State<MyHomePage> {
   // Secound Page limit
   int limit = 0;
   ScrollController? _scrollController = null;
+
+  Future<List<Task>> loadTaskFromDb(String recordName) async {
+    if (await store!.record(recordName).exists(db!)) {
+      try {
+        return (((await store!.record(recordName).get(db!)) as List<dynamic>)
+            .map((e) => Task.fromJson(e))
+            .toList());
+      } catch (e) {
+        //TODO: Deal with error waring
+        print("Failed to process tasks: " + e.toString());
+        await store!.record(recordName).delete(db!);
+        //throw new Error();
+        //TODO maybe throw error
+        return [];
+      }
+    }
+    return [];
+  }
 
   //Set up Load Database
   Future startDb() async {
@@ -100,28 +119,12 @@ class _MyHomePageState extends State<MyHomePage> {
       });
     }
 
-    if (await store!.record('tasks').exists(db!)) {
-      try {
-        List<Task> tempTasks =
-            (((await store!.record('tasks').get(db!)) as List<dynamic>)
-                .map((e) => Task.fromJson(e))
-                .toList());
-        setState(() {
-          tasks = tempTasks;
-        });
-      } catch (e) {
-        print("Failed to process tasks: " + e.toString());
-        //TODO: Deal with error waring
-        await store!.record('tasks').delete(db!);
-        //TODO: improve
-        startDb();
-        return;
-      }
-    } else {
-      setState(() {
-        tasks = [];
-      });
-    }
+    List<Task> tempTasks = await loadTaskFromDb('tasks');
+    List<Task> tempOldTasks = await loadTaskFromDb('oldTasks');
+    setState(() {
+      tasks = tempTasks;
+      oldTasks = tempOldTasks;
+    });
 
     if (await store!.record('tasksGenerators').exists(db!)) {
       try {
@@ -134,12 +137,12 @@ class _MyHomePageState extends State<MyHomePage> {
           taskGenerators = tempTaskGenerators;
         });
       } catch (e) {
-        print("Failed to process tasks generators: " + e.toString());
         //TODO: Deal with error waring
+        print("Failed to process tasks generators: " + e.toString());
         await store!.record('tasksGenerators').delete(db!);
-        //TODO: improve
-        startDb();
-        return;
+        setState(() {
+          taskGenerators = [];
+        });
       }
     } else {
       setState(() {
@@ -159,6 +162,9 @@ class _MyHomePageState extends State<MyHomePage> {
     // probably add a tost
     if (store == null || db == null) return;
     await store!.record('profile').put(db!, profile!.toJson());
+    await store!
+        .record('oldTasks')
+        .put(db!, oldTasks.map((e) => e.toJSON()).toList());
     await store!
         .record('tasks')
         .put(db!, tasks.map((e) => e.toJSON()).toList());
@@ -204,15 +210,18 @@ class _MyHomePageState extends State<MyHomePage> {
     startDb();
   }
 
+  //TODO implet a dialog that shows the items that were auto failed
   //! Note: This function saves the db
   Future checkTasks() async {
     tz.Location location =
         tz.getLocation(await FlutterNativeTimezone.getLocalTimezone());
     int index = 0;
-    for (var task in tasks) {
+    var t = [...tasks];
+    for (var task in t) {
       index++;
       if (!task.done) {
-        if (task.taskType is TaskTypeOnce &&
+        if ((task.taskType is TaskTypeOnce ||
+                task.taskType is TaskTypeRepeatEveryDay) &&
             generalNotificationDetails != null) {
           //Check the task
           //If the task is already past the time and was not recoverd by the user
@@ -249,6 +258,22 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       }
     }
+
+    DateTime nowTime = new DateTime.now();
+
+    List<Task> newOldTasks = tasks
+        .where((e) =>
+            e.date!.month <= nowTime.month && e.date!.year <= nowTime.year)
+        .toList();
+
+    tasks = tasks
+        .where((element) =>
+            element.date!.month >= nowTime.month &&
+            element.date!.year >= nowTime.year)
+        .toList();
+
+    oldTasks = [...oldTasks, ...newOldTasks];
+
     saveDb();
   }
 
@@ -388,7 +413,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
     List<Widget> taskWidgets = taskTuples
         .where((e) => e.t.date!.month >= t.month)
-        .take(15 * limit)
         .map((t) => TaskWidget(task: t.t, taskChanged: taskChanged(t.k)))
         .toList();
 
@@ -467,9 +491,7 @@ class _MyHomePageState extends State<MyHomePage> {
               ghost: true,
               task: t.k,
               taskChanged: (Task tas) {
-                print("${tas.fail} ${tas.directToFail}");
                 if (tas.fail) {
-                  print("showAlert");
                   showAlertDialog(
                       context,
                       "Do you want to remove ${tas.title}?",
@@ -590,7 +612,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ? _buildDoneTask()
                 : ProfileWidget(
                     profile: this.profile!,
-                    //TODO: Inprove this
+                    //TODO: Improve this
                     logOut: () {
                       setState(() {
                         this.profile =
@@ -608,7 +630,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        //TODO: inprove this
+        //TODO: improve this
         items: [
           BottomNavigationBarItem(icon: const Icon(Icons.list), label: 'Tasks'),
           BottomNavigationBarItem(
