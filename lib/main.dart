@@ -397,12 +397,15 @@ class _MyHomePageState extends State<MyHomePage> {
       SizedBox(height: 40),
       Expanded(
           child: SingleChildScrollView(
-        controller: _scrollController,
         child: Column(
           children: [
             BoxHolder(
               name: 'This month',
-              children: taskWidgets,
+              children: [
+                SingleChildScrollView(
+                    controller: _scrollController,
+                    child: Column(children: taskWidgets))
+              ],
               toggleable: true,
               defaultActive: true,
             )

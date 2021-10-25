@@ -27,6 +27,12 @@ class _BoxHolderState extends State<BoxHolder> {
 
   @override
   Widget build(BuildContext context) {
+    var toggle = () {
+      if (widget.toggleable)
+        setState(() {
+          active = !active;
+        });
+    };
     return Column(
       children: [
         Row(
@@ -42,37 +48,39 @@ class _BoxHolderState extends State<BoxHolder> {
                     ]),
                     // Title container decoration end
                     child: GestureDetector(
-                        onTap: () {
-                          if (widget.toggleable)
-                            setState(() {
-                              active = !active;
-                            });
-                        },
+                        onTap: toggle,
+                        onLongPress: toggle,
                         child: Padding(
                           //TODO: Improve change for an icon at the end of the row
-                          child: Text(widget.name +
-                              (!widget.toggleable
-                                  ? ""
+                          child: Row(children: [
+                            Expanded(child: Text(widget.name)),
+                            Icon(
+                              !widget.toggleable
+                                  ? Icons.keyboard_arrow_right
                                   : active
-                                      ? "/\\"
-                                      : "\\/")),
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.keyboard_arrow_down,
+                            )
+                          ]),
                           padding: EdgeInsets.symmetric(vertical: 8)
                               .add(EdgeInsets.only(left: 10)),
                         )))),
-            Expanded(
-                child: SingleChildScrollView(
-                    child: Column(
-              children: !widget.toggleable || active
-                  // Children that appear
-                  ? widget.children
-                  : [
-                      SizedBox(
-                        width: 0,
-                      )
-                    ],
-            )))
           ],
-        )
+        ),
+        Row(children: [
+          Expanded(
+              child: SingleChildScrollView(
+                  child: Column(
+            children: !widget.toggleable || active
+                // Children that appear
+                ? widget.children
+                : [
+                    SizedBox(
+                      width: 0,
+                    )
+                  ],
+          )))
+        ])
       ],
     );
   }
