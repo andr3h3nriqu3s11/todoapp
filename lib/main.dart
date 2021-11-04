@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:app/BoxHolder.dart';
+import 'package:app/DialogDeletedItems.dart';
 import 'package:app/EditNewItem.dart';
 import 'package:app/Profile.dart';
 import 'package:app/Start.dart';
@@ -71,9 +72,12 @@ class _MyHomePageState extends State<MyHomePage> {
   Tuple<int, Task>? lastTaskDone;
   Tuple<TaskGenerator, Offset>? dragTaskGenerator;
 
+  List<Tuple<int, Task>> deletedTasksNotification = [];
+  bool deletedTasksShown = false;
+
   // Secound Page limit
   int limit = 0;
-  ScrollController? _scrollController = null;
+  ScrollController? _scrollController;
 
   Future<List<Task>> loadTaskFromDb(String recordName) async {
     if (await store!.record(recordName).exists(db!)) {
@@ -152,8 +156,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     setState(() {
       loaded = true;
-      generateTasks();
-      checkTasks();
+      generateTasks(null);
     });
   }
 
@@ -212,7 +215,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   //TODO implet a dialog that shows the items that were auto failed
   //! Note: This function saves the db
-  Future checkTasks() async {
+  Future checkTasks(BuildContext? context) async {
     tz.Location location =
         tz.getLocation(await FlutterNativeTimezone.getLocalTimezone());
     int index = 0;
@@ -232,7 +235,10 @@ class _MyHomePageState extends State<MyHomePage> {
               task.fail = true;
               task.directToFail = true;
               //Call the task changed function to deal with the points
-              taskChanged(index)(task);
+              taskChanged(index, context)(task);
+              setState(() {
+                deletedTasksNotification.add(Tuple(k: index, t: task));
+              });
             }
           } else if (task.date!
               .subtract(Duration(minutes: 15))
@@ -259,7 +265,19 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     }
 
-    DateTime nowTime = new DateTime.now();
+    if (context != null && deletedTasksNotification.length > 0 && deletedTasksShown) {
+      setState(() {
+        deletedTasksShown = true;
+      });
+      showItemsDialog(context, deletedTasksNotification, taskChanged, () {
+        setState(() {
+          deletedTasksShown = false;
+          deletedTasksNotification = [];
+        });
+      });
+    }
+
+    /*DateTime nowTime = new DateTime.now();
 
     List<Task> newOldTasks = tasks
         .where((e) =>
@@ -272,7 +290,7 @@ class _MyHomePageState extends State<MyHomePage> {
             element.date!.year >= nowTime.year)
         .toList();
 
-    oldTasks = [...oldTasks, ...newOldTasks];
+    oldTasks = [...oldTasks, ...newOldTasks];*/
 
     saveDb();
   }
@@ -287,14 +305,14 @@ class _MyHomePageState extends State<MyHomePage> {
                       taskGenerators.add(task);
                     });
                     Navigator.pop(context);
-                    generateTasks();
+                    generateTasks(context);
                   },
                 )));
   }
 
   //! Note: this function calls a function that saves the db
   //! Note: this function calls the checkTasks function
-  void generateTasks() {
+  void generateTasks(BuildContext? context) {
     List<TaskGenerator> t = [];
     List<Tuple<Task, TaskGenerator>> ghostTasksNew = [];
     for (var a in taskGenerators) {
@@ -311,12 +329,12 @@ class _MyHomePageState extends State<MyHomePage> {
       ghostTasks = ghostTasksNew;
     });
     localNotification.cancelAll();
-    checkTasks();
+    checkTasks(context);
   }
 
   //! Note: When removing from fail only change to task.done to false
   //! Note: This function saves the db
-  taskChanged(int index) {
+  taskChanged(int index, BuildContext? context) {
     return (Task task) {
       // something -> Fail -> not done
       // The xp points and the money need to be restored
@@ -338,7 +356,7 @@ class _MyHomePageState extends State<MyHomePage> {
             lastTaskDone = null;
           }
         });
-        generateTasks();
+        generateTasks(context);
         return;
       }
 
@@ -357,7 +375,7 @@ class _MyHomePageState extends State<MyHomePage> {
           task.taskAddedPoints = false;
         } else if (task.done) {
           localNotification.cancel(task.id);
-          generateTasks();
+          generateTasks(context);
           this.profile!.addXp(task.xp);
           this.profile!.money += task.money;
           lastTaskDone = Tuple(k: index, t: task);
@@ -375,7 +393,7 @@ class _MyHomePageState extends State<MyHomePage> {
         }
         tasks[index] = task;
       });
-      generateTasks();
+      generateTasks(context);
     };
   }
 
@@ -390,7 +408,7 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  Widget _buildDoneTask() {
+  Widget _buildDoneTask(BuildContext context) {
     //Get rigth taks
     int index = 0;
 
@@ -413,7 +431,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
     List<Widget> taskWidgets = taskTuples
         .where((e) => e.t.date!.month >= t.month)
-        .map((t) => TaskWidget(task: t.t, taskChanged: taskChanged(t.k)))
+        .map((t) =>
+            TaskWidget(task: t.t, taskChanged: taskChanged(t.k, context)))
         .toList();
 
     // Return content for the page
@@ -456,7 +475,8 @@ class _MyHomePageState extends State<MyHomePage> {
       return a.t.date!.compareTo(b.t.date!);
     });
     List<Widget> taskWidgets = taskTuples
-        .map((t) => TaskWidget(task: t.t, taskChanged: taskChanged(t.k)))
+        .map((t) =>
+            TaskWidget(task: t.t, taskChanged: taskChanged(t.k, context)))
         .toList();
 
     //Create Widgets out of it
@@ -499,7 +519,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     taskGenerators.remove(t.t);
                     ghostTasks.remove(t.k);
                     //Note no need to save the db as this function will save the db
-                    generateTasks();
+                    generateTasks(context);
                   }, () {});
                 }
               },
@@ -576,7 +596,7 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             TaskWidget(
                 task: lastTaskDone!.t,
-                taskChanged: taskChanged(lastTaskDone!.k))
+                taskChanged: taskChanged(lastTaskDone!.k, context))
           ],
         )
     ]);
@@ -591,7 +611,8 @@ class _MyHomePageState extends State<MyHomePage> {
         color: Colors.blue,
       );
     }
-    //Return the create page
+
+    //Return the create user profile page
     if (!isProfileCreated) {
       return CreateAccount(
           profile: this.profile ?? Profile(level: 0, xp: 0, money: 0, name: ''),
@@ -603,13 +624,14 @@ class _MyHomePageState extends State<MyHomePage> {
             });
           });
     }
+
     //Return the main app
     return Scaffold(
       body: Center(
         child: _selectedIndex == 0
             ? _buildToDoTask(context)
             : _selectedIndex == 1
-                ? _buildDoneTask()
+                ? _buildDoneTask(context)
                 : ProfileWidget(
                     profile: this.profile!,
                     //TODO: Improve this
