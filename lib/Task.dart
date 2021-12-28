@@ -17,6 +17,7 @@ class Task {
       this.userRemovedFromFail = false,
       this.taskAddedPoints = false,
       this.taskType});
+
   int id;
   String title;
   bool done;
@@ -28,6 +29,7 @@ class Task {
   bool directToFail;
   bool userRemovedFromFail;
   bool taskAddedPoints;
+
   //Profile Effects
   double xp;
   double money;
@@ -122,9 +124,17 @@ abstract class TaskType {
       required this.moneyPerTask,
       required this.moneyPerTaskCombo,
       required this.xpLost,
-      required this.moneyLost});
+      required this.moneyLost,
+      required this.date,
+      required this.done,
+      required this.id});
+
   Task? generate(Task baseTask, List<Task> oldTasks);
-  bool finished();
+
+  bool finished() {
+    return this.done;
+  }
+
   Task? generateGhostTask(Task baseTask, List<Task> oldTasks);
   Map<String, dynamic> toJson();
 
@@ -133,6 +143,8 @@ abstract class TaskType {
       return TaskTypeOnce.fromJson(json["json"]);
     } else if (json["type"] == "repeatEveryDay") {
       return TaskTypeRepeatEveryDay.fromJson(json["json"]);
+    } else if (json["type"] == "failTask") {
+      return TaskTypeFailTask.fromJson(json["json"]);
     } else {
       throw Exception("InvalidJson");
     }
@@ -144,6 +156,9 @@ abstract class TaskType {
   double moneyPerTaskCombo;
   double xpLost;
   double moneyLost;
+  DateTime date;
+  int id;
+  bool done = false;
 }
 
 class TaskTypeOnce extends TaskType {
@@ -154,21 +169,19 @@ class TaskTypeOnce extends TaskType {
       required double moneyPerTaskCombo,
       required double xpLost,
       required double moneyLost,
-      required this.date,
-      required this.id,
-      this.done = false})
+      required DateTime date,
+      required int id,
+      bool done = false})
       : super(
             xpPerTask: xpPerTask,
             xpLost: xpLost,
             xpPerTaskCombo: xpPerTaskCombo,
             moneyLost: moneyLost,
             moneyPerTask: moneyPerTask,
-            moneyPerTaskCombo: moneyPerTaskCombo);
-
-  DateTime date;
-  int id;
-
-  bool done = false;
+            moneyPerTaskCombo: moneyPerTaskCombo,
+            date: date,
+            id: id,
+            done: done);
 
   @override
   Task generate(Task baseTask, List<Task> oldTasks) {
@@ -185,11 +198,6 @@ class TaskTypeOnce extends TaskType {
       newTask.userRemovedFromFail = true;
     }
     return newTask;
-  }
-
-  @override
-  bool finished() {
-    return done;
   }
 
   @override
@@ -216,7 +224,6 @@ class TaskTypeOnce extends TaskType {
   }
 
   factory TaskTypeOnce.fromJson(Map<String, dynamic> json) {
-    print(json);
     return TaskTypeOnce(
         date: DateTime.tryParse(json["date"])!,
         moneyLost: json["moneyLost"],
@@ -238,20 +245,19 @@ class TaskTypeRepeatEveryDay extends TaskType {
       required double moneyPerTaskCombo,
       required double xpLost,
       required double moneyLost,
-      required this.date,
-      this.done = false,
-      required this.id})
+      required DateTime date,
+      bool done = false,
+      required int id})
       : super(
             xpPerTask: xpPerTask,
             xpLost: xpLost,
             xpPerTaskCombo: xpPerTaskCombo,
             moneyLost: moneyLost,
             moneyPerTask: moneyPerTask,
-            moneyPerTaskCombo: moneyPerTaskCombo);
-
-  int id;
-  DateTime date;
-  bool done = false;
+            moneyPerTaskCombo: moneyPerTaskCombo,
+            id: id,
+            done: done,
+            date: date);
 
   @override
   Task? generate(Task baseTask, List<Task> oldTasks) {
@@ -293,11 +299,6 @@ class TaskTypeRepeatEveryDay extends TaskType {
       newTask.userRemovedFromFail = true;
     }
     return newTask;
-  }
-
-  @override
-  bool finished() {
-    return done;
   }
 
   @override
@@ -368,6 +369,82 @@ class TaskTypeRepeatEveryDay extends TaskType {
         xpPerTaskCombo: json["xpPerTaskCombo"],
         id: json["id"],
         done: json["done"]);
+  }
+}
+
+class TaskTypeFailTask extends TaskType {
+  TaskTypeFailTask({
+    required double xpPerTask,
+    required double xpPerTaskCombo,
+    required double moneyPerTask,
+    required double moneyPerTaskCombo,
+    required double xpLost,
+    required double moneyLost,
+    required DateTime date,
+    required int id,
+    bool done = false,
+  }) : super(
+            xpPerTask: xpPerTask,
+            xpLost: xpLost,
+            xpPerTaskCombo: xpPerTaskCombo,
+            moneyLost: moneyLost,
+            moneyPerTask: moneyPerTask,
+            moneyPerTaskCombo: moneyPerTaskCombo,
+            id: id,
+            date: date,
+            done: done);
+
+  factory TaskTypeFailTask.fromJson(Map<String, dynamic> json) {
+    return TaskTypeFailTask(
+        date: DateTime.tryParse(json["date"])!,
+        moneyLost: json["moneyLost"],
+        moneyPerTask: json["moneyPerTask"],
+        moneyPerTaskCombo: json["moneyPerTaskCombo"],
+        xpLost: json["xpLost"],
+        xpPerTask: json["xpPerTask"],
+        xpPerTaskCombo: json["xpPerTaskCombo"],
+        id: json["id"],
+        done: json["done"]);
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      'type': 'fail',
+      'json': {
+        "xpPerTask": this.xpPerTask,
+        "xpLost": this.xpLost,
+        "xpPerTaskCombo": this.xpPerTaskCombo,
+        "moneyLost": this.moneyLost,
+        "moneyPerTask": this.moneyPerTask,
+        "moneyPerTaskCombo": this.moneyPerTaskCombo,
+        "done": this.done,
+        "id": this.id,
+        "date": this.date.toIso8601String()
+      }
+    };
+  }
+
+  @override
+  Task generate(Task baseTask, List<Task> oldTasks) {
+    done = true;
+    Task newTask = baseTask.clone();
+    newTask.date = this.date;
+    newTask.id = this.id;
+    newTask.taskType = this;
+    newTask.xp = this.xpPerTask;
+    newTask.money = this.moneyPerTask;
+    newTask.xpLost = this.xpLost;
+    newTask.moneyLost = this.moneyLost;
+    if (this.date.isBefore(DateTime.now())) {
+      newTask.userRemovedFromFail = true;
+    }
+    return newTask;
+  }
+
+  @override
+  Task? generateGhostTask(Task baseTask, List<Task> oldTasks) {
+    return null;
   }
 }
 

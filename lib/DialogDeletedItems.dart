@@ -25,7 +25,7 @@ void showItemsDialog(BuildContext context, List<Tuple<int, Task>> list,
       child: Text("Yes"));
 
   AlertDialog dialog = AlertDialog(
-    title: Text("Deleted Notifications"),
+    title: Text("Failed Notifications"),
     content: Column(children: [
       SizedBox(height: 40),
       Expanded(
