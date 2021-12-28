@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 
 class DatePicker extends StatelessWidget {
   const DatePicker(
@@ -61,6 +60,7 @@ class DatePicker extends StatelessWidget {
         new Expanded(
           flex: 3,
           child: new _InputDropdown(
+            labelText: labelText,
             valueText: selectedTime.format(context),
             onPressed: () {
               _selectTime(context);

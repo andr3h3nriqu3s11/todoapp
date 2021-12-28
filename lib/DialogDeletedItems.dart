@@ -1,7 +1,6 @@
 import 'package:app/Task.dart';
 import 'package:app/Utils.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 
 void showItemsDialog(BuildContext context, List<Tuple<int, Task>> list,
     Function taskChanged, Function onClose) {

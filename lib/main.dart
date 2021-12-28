@@ -224,12 +224,15 @@ class _MyHomePageState extends State<MyHomePage> {
       index++;
       if (!task.done) {
         if ((task.taskType is TaskTypeOnce ||
-                task.taskType is TaskTypeRepeatEveryDay) &&
+                task.taskType is TaskTypeRepeatEveryDay ||
+                task.taskType is TaskTypeFailTask) &&
             generalNotificationDetails != null) {
           //Check the task
           //If the task is already past the time and was not recoverd by the user
           // then marked it as failed
           if (task.date!.isBefore(DateTime.now())) {
+            // If the user did not change this to the fail position then
+            // change to a failed notification
             if (!task.userRemovedFromFail) {
               task.done = true;
               task.fail = true;
@@ -243,16 +246,28 @@ class _MyHomePageState extends State<MyHomePage> {
           } else if (task.date!
               .subtract(Duration(minutes: 15))
               .isBefore(DateTime.now())) {
+            // Create a notification
+            if (task.notificationId != null)
+              localNotification.cancel(task.notificationId!);
+            //TODO improve this
+            task.notificationId = new Random().nextInt(100000000);
             localNotification.show(
-                task.id,
+                task.notificationId!,
                 "A task needs to be done",
                 "The Task: " + task.title + " needs to be completed.",
                 generalNotificationDetails!);
           } else {
+            // Create a notification
+            if (task.notificationId != null)
+              localNotification.cancel(task.notificationId!);
+            //TODO improve this
+            task.notificationId = new Random().nextInt(100000000);
+
             var date = tz.TZDateTime.from(
                 task.date!.subtract(Duration(minutes: 15)), location);
+
             localNotification.zonedSchedule(
-                task.id,
+                task.notificationId!,
                 "A task needs to be done",
                 "The task: " + task.title + " needs to be completed.",
                 date,
@@ -265,7 +280,9 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     }
 
-    if (context != null && deletedTasksNotification.length > 0 && deletedTasksShown) {
+    if (context != null &&
+        deletedTasksNotification.length > 0 &&
+        deletedTasksShown) {
       setState(() {
         deletedTasksShown = true;
       });
@@ -300,10 +317,15 @@ class _MyHomePageState extends State<MyHomePage> {
         context,
         MaterialPageRoute(
             builder: (context) => EditNewItemRoute(
-                  newTaskGenerator: (TaskGenerator task) {
+                  failTasksGenerators: this
+                      .taskGenerators
+                      .where((element) => element.type is TaskTypeFailTask)
+                      .toList(),
+                  newTaskGenerator: (TaskGenerator task) async {
                     setState(() {
                       taskGenerators.add(task);
                     });
+                    await this.saveDb();
                     Navigator.pop(context);
                     generateTasks(context);
                   },
@@ -374,7 +396,8 @@ class _MyHomePageState extends State<MyHomePage> {
           lastTaskDone = Tuple(k: index, t: task);
           task.taskAddedPoints = false;
         } else if (task.done) {
-          localNotification.cancel(task.id);
+          if (task.notificationId != null)
+            localNotification.cancel(task.notificationId!);
           generateTasks(context);
           this.profile!.addXp(task.xp);
           this.profile!.money += task.money;
@@ -497,13 +520,13 @@ class _MyHomePageState extends State<MyHomePage> {
             },
             onHorizontalDragUpdate: (DragUpdateDetails e) {
               if (dragTaskGenerator != null &&
-                  dragTaskGenerator!.k.base.id == t.k.id) {
+                  dragTaskGenerator!.k.base.taskId == t.k.taskId) {
                 //TODO drag animation
               }
             },
             onHorizontalDragEnd: (DragEndDetails e) {
               if (dragTaskGenerator != null &&
-                  dragTaskGenerator!.k.base.id == t.k.id) {
+                  dragTaskGenerator!.k.base.taskId == t.k.taskId) {
                 //TODO drag action
               }
             },
@@ -634,6 +657,25 @@ class _MyHomePageState extends State<MyHomePage> {
                 ? _buildDoneTask(context)
                 : ProfileWidget(
                     profile: this.profile!,
+                    removeTaskGenerator: (TaskGenerator e) {
+                      setState(() {
+                        this.taskGenerators = this
+                            .taskGenerators
+                            .where((element) => element != e)
+                            .toList();
+                        this.tasks = this.tasks.where((element) {
+                          if (element.taskType != null) {
+                            if (element.taskType!.id == e.type.id &&
+                                !element.done) {
+                              return false;
+                            }
+                          }
+                          return true;
+                        }).toList();
+                      });
+                      this.saveDb();
+                    },
+                    taskGenerators: this.taskGenerators,
                     //TODO: Improve this
                     logOut: () {
                       setState(() {

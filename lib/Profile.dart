@@ -1,13 +1,24 @@
+import 'dart:math';
+
+import 'package:app/Task.dart';
+import 'package:app/Utils.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 
 //TODO: Improve a lot
 class ProfileWidget extends StatelessWidget {
-  const ProfileWidget({Key? key, required this.profile, required this.logOut})
+  const ProfileWidget(
+      {Key? key,
+      required this.profile,
+      required this.logOut,
+      required this.taskGenerators,
+      required this.removeTaskGenerator})
       : super(key: key);
 
   final Profile profile;
+  final List<TaskGenerator> taskGenerators;
+
   final void Function() logOut;
+  final void Function(TaskGenerator e) removeTaskGenerator;
 
   @override
   Widget build(BuildContext context) {
@@ -30,9 +41,36 @@ class ProfileWidget extends StatelessWidget {
         Text('XP: ${profile.xp}'),
         LinearProgressIndicator(
           value: profile.xp / profile.getLevelXp(),
+          color: profile.level > 0 ? null : Colors.red,
         ),
         Text('Money: ${profile.money}'),
-        ElevatedButton(onPressed: logOut, child: Text('Logout'))
+        ElevatedButton(onPressed: logOut, child: Text('Logout')),
+
+        //Tasks Generator
+        //TODO change this
+        if (taskGenerators.length > 0) Text('Task Generators'),
+        if (taskGenerators.length > 0)
+          SizedBox(
+            height: min(5, this.taskGenerators.length) * 92,
+            child: SingleChildScrollView(
+              child: Column(
+                children: this.taskGenerators.map((e) {
+                  return TaskWidget(
+                    task: e.base,
+                    taskChanged: (t) {
+                      showAlertDialog(
+                          context,
+                          'Are you sure you want to remove this task!',
+                          'Remove task', () {
+                        this.removeTaskGenerator(e);
+                      }, () {});
+                    },
+                    ghost: true,
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
       ],
     );
   }

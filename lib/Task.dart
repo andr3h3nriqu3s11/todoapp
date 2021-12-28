@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 
 class Task {
   Task(
-      {this.id = 0,
+      {required this.taskId,
       required this.title,
       this.date,
       this.icon,
@@ -13,18 +13,24 @@ class Task {
       this.money = 0,
       this.moneyLost = 0,
       this.xpLost = 0,
+      this.notificationId = null,
       this.directToFail = false,
       this.userRemovedFromFail = false,
       this.taskAddedPoints = false,
-      this.taskType});
+      this.taskType,
+      this.failTasks});
 
-  int id;
+  String taskId;
   String title;
   bool done;
   bool fail;
   IconData? icon;
   DateTime? date;
   TaskType? taskType;
+
+  // Fail Actions
+  List<int>? failTasks;
+
   //Control
   bool directToFail;
   bool userRemovedFromFail;
@@ -36,13 +42,16 @@ class Task {
   double xpLost;
   double moneyLost;
 
+  //Notification
+  int? notificationId;
+
   static emptyTask() {
-    return new Task(title: "");
+    return new Task(title: "", taskId: "");
   }
 
   Task clone() {
     return Task(
-        id: this.id,
+        taskId: this.taskId,
         title: this.title,
         date: this.date,
         done: this.done,
@@ -60,7 +69,7 @@ class Task {
             "matchTextDirection": this.icon?.matchTextDirection,
           };
     return {
-      "id": this.id,
+      "id": this.taskId,
       "title": this.title,
       "done": this.done,
       "fail": this.fail,
@@ -73,6 +82,7 @@ class Task {
       "money": this.money,
       "xpLost": this.xpLost,
       "moneyLost": this.moneyLost,
+      "failTasks": this.failTasks,
     };
   }
 
@@ -83,8 +93,9 @@ class Task {
             fontPackage: json["icon"]["fontPackage"],
             matchTextDirection: json["icon"]["matchTextDirection"])
         : null;
+
     return Task(
-      id: json["id"],
+      taskId: json["id"],
       title: json["title"],
       done: json["done"],
       fail: json["fail"],
@@ -98,14 +109,17 @@ class Task {
       money: json["money"],
       xpLost: json["xpLost"],
       moneyLost: json["moneyLost"],
+      failTasks: json["failTasks"],
     );
   }
 }
 
 class TaskGenerator {
   TaskGenerator({required this.type, required this.base});
+
   TaskType type;
   Task base;
+
   Map<String, dynamic> toJson() {
     return {"base": base.toJSON(), "type": type.toJson()};
   }
@@ -125,16 +139,10 @@ abstract class TaskType {
       required this.moneyPerTaskCombo,
       required this.xpLost,
       required this.moneyLost,
-      required this.date,
-      required this.done,
       required this.id});
 
   Task? generate(Task baseTask, List<Task> oldTasks);
-
-  bool finished() {
-    return this.done;
-  }
-
+  bool finished();
   Task? generateGhostTask(Task baseTask, List<Task> oldTasks);
   Map<String, dynamic> toJson();
 
@@ -150,15 +158,13 @@ abstract class TaskType {
     }
   }
 
+  String id;
   double xpPerTask;
   double xpPerTaskCombo;
   double moneyPerTask;
   double moneyPerTaskCombo;
   double xpLost;
   double moneyLost;
-  DateTime date;
-  int id;
-  bool done = false;
 }
 
 class TaskTypeOnce extends TaskType {
@@ -169,9 +175,9 @@ class TaskTypeOnce extends TaskType {
       required double moneyPerTaskCombo,
       required double xpLost,
       required double moneyLost,
-      required DateTime date,
-      required int id,
-      bool done = false})
+      required this.date,
+      required String id,
+      this.done = false})
       : super(
             xpPerTask: xpPerTask,
             xpLost: xpLost,
@@ -179,16 +185,22 @@ class TaskTypeOnce extends TaskType {
             moneyLost: moneyLost,
             moneyPerTask: moneyPerTask,
             moneyPerTaskCombo: moneyPerTaskCombo,
-            date: date,
-            id: id,
-            done: done);
+            id: id);
+
+  bool done;
+  DateTime date;
+
+  @override
+  bool finished() {
+    return this.done;
+  }
 
   @override
   Task generate(Task baseTask, List<Task> oldTasks) {
     done = true;
     Task newTask = baseTask.clone();
     newTask.date = this.date;
-    newTask.id = this.id;
+    newTask.taskId = this.id;
     newTask.taskType = this;
     newTask.xp = this.xpPerTask;
     newTask.money = this.moneyPerTask;
@@ -245,9 +257,8 @@ class TaskTypeRepeatEveryDay extends TaskType {
       required double moneyPerTaskCombo,
       required double xpLost,
       required double moneyLost,
-      required DateTime date,
-      bool done = false,
-      required int id})
+      required this.date,
+      required String id})
       : super(
             xpPerTask: xpPerTask,
             xpLost: xpLost,
@@ -255,9 +266,14 @@ class TaskTypeRepeatEveryDay extends TaskType {
             moneyLost: moneyLost,
             moneyPerTask: moneyPerTask,
             moneyPerTaskCombo: moneyPerTaskCombo,
-            id: id,
-            done: done,
-            date: date);
+            id: id);
+
+  DateTime date;
+
+  @override
+  bool finished() {
+    return false;
+  }
 
   @override
   Task? generate(Task baseTask, List<Task> oldTasks) {
@@ -268,7 +284,7 @@ class TaskTypeRepeatEveryDay extends TaskType {
     oldTasks
         .where((element) =>
             (element.taskType is TaskTypeRepeatEveryDay) &&
-            element.id == this.id)
+            element.taskId == this.id)
         .forEach((element) {
       if (lastTask == null && element.date != null) {
         lastTask = element;
@@ -289,7 +305,7 @@ class TaskTypeRepeatEveryDay extends TaskType {
     Task newTask = baseTask.clone();
     newTask.date = DateTime(
         today.year, today.month, today.day, this.date.hour, this.date.minute);
-    newTask.id = this.id;
+    newTask.taskId = this.id;
     newTask.taskType = this;
     newTask.xp = this.xpPerTask;
     newTask.money = this.moneyPerTask;
@@ -308,12 +324,14 @@ class TaskTypeRepeatEveryDay extends TaskType {
     oldTasks
         .where((element) => element.taskType is TaskTypeRepeatEveryDay)
         .forEach((element) {
-      if (lastTask == null && element.date != null && element.id == this.id) {
+      if (lastTask == null &&
+          element.date != null &&
+          element.taskId == this.id) {
         lastTask = element;
       } else if (lastTask != null &&
           element.date != null &&
           lastTask!.date!.isBefore(element.date!) &&
-          element.id == this.id) {
+          element.taskId == this.id) {
         lastTask = element;
       }
     });
@@ -331,7 +349,7 @@ class TaskTypeRepeatEveryDay extends TaskType {
     Task newTask = baseTask.clone();
     newTask.date = DateTime(tomorrow.year, tomorrow.month, tomorrow.day,
         this.date.hour, this.date.minute);
-    newTask.id = this.id;
+    newTask.taskId = this.id;
     newTask.taskType = this;
     newTask.xp = this.xpPerTask;
     newTask.money = this.moneyPerTask;
@@ -351,7 +369,6 @@ class TaskTypeRepeatEveryDay extends TaskType {
         "moneyLost": this.moneyLost,
         "moneyPerTask": this.moneyPerTask,
         "moneyPerTaskCombo": this.moneyPerTaskCombo,
-        "done": this.done,
         "id": this.id,
         "date": date.toIso8601String()
       }
@@ -367,11 +384,11 @@ class TaskTypeRepeatEveryDay extends TaskType {
         xpLost: json["xpLost"],
         xpPerTask: json["xpPerTask"],
         xpPerTaskCombo: json["xpPerTaskCombo"],
-        id: json["id"],
-        done: json["done"]);
+        id: json["id"]);
   }
 }
 
+// This is a TaskType that refers to the task that is created as "punishment task"
 class TaskTypeFailTask extends TaskType {
   TaskTypeFailTask({
     required double xpPerTask,
@@ -380,9 +397,8 @@ class TaskTypeFailTask extends TaskType {
     required double moneyPerTaskCombo,
     required double xpLost,
     required double moneyLost,
-    required DateTime date,
-    required int id,
-    bool done = false,
+    required String id,
+    required this.daysToComplete,
   }) : super(
             xpPerTask: xpPerTask,
             xpLost: xpLost,
@@ -390,13 +406,12 @@ class TaskTypeFailTask extends TaskType {
             moneyLost: moneyLost,
             moneyPerTask: moneyPerTask,
             moneyPerTaskCombo: moneyPerTaskCombo,
-            id: id,
-            date: date,
-            done: done);
+            id: id);
+
+  int daysToComplete;
 
   factory TaskTypeFailTask.fromJson(Map<String, dynamic> json) {
     return TaskTypeFailTask(
-        date: DateTime.tryParse(json["date"])!,
         moneyLost: json["moneyLost"],
         moneyPerTask: json["moneyPerTask"],
         moneyPerTaskCombo: json["moneyPerTaskCombo"],
@@ -404,7 +419,12 @@ class TaskTypeFailTask extends TaskType {
         xpPerTask: json["xpPerTask"],
         xpPerTaskCombo: json["xpPerTaskCombo"],
         id: json["id"],
-        done: json["done"]);
+        daysToComplete: json["daysToComplete"]);
+  }
+
+  @override
+  bool finished() {
+    return false;
   }
 
   @override
@@ -418,27 +438,25 @@ class TaskTypeFailTask extends TaskType {
         "moneyLost": this.moneyLost,
         "moneyPerTask": this.moneyPerTask,
         "moneyPerTaskCombo": this.moneyPerTaskCombo,
-        "done": this.done,
         "id": this.id,
-        "date": this.date.toIso8601String()
+        "daysToComplete": this.daysToComplete,
       }
     };
   }
 
   @override
-  Task generate(Task baseTask, List<Task> oldTasks) {
-    done = true;
+  Task? generate(Task _baseTask, List<Task> _oldTasks) {
+    return null;
+  }
+
+  Task generateFail(Task baseTask) {
     Task newTask = baseTask.clone();
-    newTask.date = this.date;
-    newTask.id = this.id;
+    newTask.taskId = this.id;
     newTask.taskType = this;
     newTask.xp = this.xpPerTask;
     newTask.money = this.moneyPerTask;
     newTask.xpLost = this.xpLost;
     newTask.moneyLost = this.moneyLost;
-    if (this.date.isBefore(DateTime.now())) {
-      newTask.userRemovedFromFail = true;
-    }
     return newTask;
   }
 
@@ -503,8 +521,9 @@ class TaskWidget extends StatelessWidget {
     var f = NumberFormat("00");
 
     var sDate = !ghost;
-
-    if (isTheSameDay(task.date!, DateTime.now())) {
+    if (ghost && task.date == null) {
+      date = "";
+    } else if (isTheSameDay(task.date!, DateTime.now())) {
       if (task.date!.hour == 23 && task.date!.minute == 59) {
         date += "Until the end Today";
         sDate = false;

@@ -2,7 +2,6 @@
 
 import 'package:app/Profile.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 
 class CreateAccount extends StatefulWidget {
   CreateAccount({Key? key, required this.profile, required this.done})
