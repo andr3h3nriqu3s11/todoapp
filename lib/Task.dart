@@ -1,10 +1,13 @@
+import 'package:app/Profile.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
 class Task {
   Task(
-      {required this.taskId,
-      required this.title,
+      {required this.title,
+      required this.id,
+      this.generatorId = "",
       this.date,
       this.icon,
       this.done = false,
@@ -13,14 +16,20 @@ class Task {
       this.money = 0,
       this.moneyLost = 0,
       this.xpLost = 0,
-      this.notificationId = null,
-      this.directToFail = false,
+      this.notificationId,
       this.userRemovedFromFail = false,
-      this.taskAddedPoints = false,
       this.taskType,
-      this.failTasks});
+      this.failTasks})
+      : this.generatedFailIds = [];
 
-  String taskId;
+  //Ids
+  String id;
+  String generatorId;
+
+  List<String> generatedFailIds;
+  //Notification
+  int? notificationId;
+
   String title;
   bool done;
   bool fail;
@@ -29,12 +38,10 @@ class Task {
   TaskType? taskType;
 
   // Fail Actions
-  List<int>? failTasks;
+  List<String>? failTasks;
 
   //Control
-  bool directToFail;
   bool userRemovedFromFail;
-  bool taskAddedPoints;
 
   //Profile Effects
   double xp;
@@ -42,16 +49,14 @@ class Task {
   double xpLost;
   double moneyLost;
 
-  //Notification
-  int? notificationId;
-
   static emptyTask() {
-    return new Task(title: "", taskId: "");
+    return new Task(title: "", id: "");
   }
 
   Task clone() {
     return Task(
-        taskId: this.taskId,
+        id: this.id,
+        generatorId: this.generatorId,
         title: this.title,
         date: this.date,
         done: this.done,
@@ -69,15 +74,14 @@ class Task {
             "matchTextDirection": this.icon?.matchTextDirection,
           };
     return {
-      "id": this.taskId,
+      "id": this.id,
+      "generatorId": this.generatorId,
       "title": this.title,
       "done": this.done,
       "fail": this.fail,
       "icon": icon,
       "date": this.date == null ? null : this.date!.toIso8601String(),
       "taskType": this.taskType == null ? null : this.taskType!.toJson(),
-      "directToFail": this.directToFail,
-      "taskAddedPoints": this.taskAddedPoints,
       "xp": this.xp,
       "money": this.money,
       "xpLost": this.xpLost,
@@ -95,7 +99,8 @@ class Task {
         : null;
 
     return Task(
-      taskId: json["id"],
+      id: json["id"],
+      generatorId: json["generatorId"],
       title: json["title"],
       done: json["done"],
       fail: json["fail"],
@@ -103,14 +108,77 @@ class Task {
       date: json["date"] == null ? null : DateTime.tryParse(json["date"]),
       taskType:
           json["taskType"] == null ? null : TaskType.fromJson(json["taskType"]),
-      directToFail: json["directToFail"],
-      taskAddedPoints: json["taskAddedPoints"],
       xp: json["xp"],
       money: json["money"],
       xpLost: json["xpLost"],
       moneyLost: json["moneyLost"],
       failTasks: json["failTasks"],
     );
+  }
+
+  void generateIdUUId() {
+    if (this.id != "") return;
+    this.id = Uuid().v1();
+  }
+
+  void taskFail(
+      TaskGenerators generatorList, TaskManager taskMan, Profile profile) {
+    this.done = true;
+    this.fail = true;
+
+    if (this.failTasks != null) {
+      List<String> generatedIds = [];
+
+      this.failTasks!.forEach((e) {
+        TaskGenerator? taskGen = generatorList.get(e);
+        if (taskGen != null && taskGen.type is TaskTypeFailTask) {
+          TaskTypeFailTask gen = taskGen.type as TaskTypeFailTask;
+          Task task = gen.generateFail(taskGen.base);
+          taskMan.add(task);
+        }
+      });
+    }
+
+    profile.taskFail(this);
+  }
+
+  void toggle(
+    TaskGenerators generatorList,
+    TaskManager taskMan,
+    Profile profile,
+  ) {
+    if (done)
+      deactivate(generatorList, taskMan, profile);
+    else {
+      done = true;
+      userRemovedFromFail = false;
+      profile.completeTask(this);
+    }
+  }
+
+  // This functions removes the done state of a task
+  void deactivate(
+    TaskGenerators generatorList,
+    TaskManager taskMan,
+    Profile profile,
+  ) {
+    done = false;
+    if (fail) {
+      fail = false;
+      userRemovedFromFail = true;
+      profile.removeDamages(this);
+
+      generatedFailIds.forEach((element) {
+        var t = taskMan.getTaskByIdUUID(element);
+        if (t != null) {
+          t.deactivate(generatorList, taskMan, profile);
+          taskMan.removeTask(t);
+        }
+      });
+
+      generatedFailIds = [];
+    } else
+      profile.removeWinnings(this);
   }
 }
 
@@ -141,9 +209,9 @@ abstract class TaskType {
       required this.moneyLost,
       required this.id});
 
-  Task? generate(Task baseTask, List<Task> oldTasks);
+  Task? generate(Task baseTask, Iterable<Task> oldTasks);
   bool finished();
-  Task? generateGhostTask(Task baseTask, List<Task> oldTasks);
+  Task? generateGhostTask(Task baseTask, Iterable<Task> oldTasks);
   Map<String, dynamic> toJson();
 
   factory TaskType.fromJson(Map<String, dynamic> json) {
@@ -196,11 +264,11 @@ class TaskTypeOnce extends TaskType {
   }
 
   @override
-  Task generate(Task baseTask, List<Task> oldTasks) {
+  Task generate(Task baseTask, Iterable<Task> oldTasks) {
     done = true;
-    Task newTask = baseTask.clone();
+    Task newTask = baseTask.clone()..generateIdUUId();
     newTask.date = this.date;
-    newTask.taskId = this.id;
+    newTask.id = this.id;
     newTask.taskType = this;
     newTask.xp = this.xpPerTask;
     newTask.money = this.moneyPerTask;
@@ -213,7 +281,7 @@ class TaskTypeOnce extends TaskType {
   }
 
   @override
-  Task? generateGhostTask(Task baseTask, List<Task> oldTasks) {
+  Task? generateGhostTask(Task baseTask, Iterable<Task> oldTasks) {
     return null;
   }
 
@@ -276,7 +344,7 @@ class TaskTypeRepeatEveryDay extends TaskType {
   }
 
   @override
-  Task? generate(Task baseTask, List<Task> oldTasks) {
+  Task? generate(Task baseTask, Iterable<Task> oldTasks) {
     //done = true;
 
     Task? lastTask;
@@ -284,7 +352,7 @@ class TaskTypeRepeatEveryDay extends TaskType {
     oldTasks
         .where((element) =>
             (element.taskType is TaskTypeRepeatEveryDay) &&
-            element.taskId == this.id)
+            element.generatorId == this.id)
         .forEach((element) {
       if (lastTask == null && element.date != null) {
         lastTask = element;
@@ -302,10 +370,10 @@ class TaskTypeRepeatEveryDay extends TaskType {
         today.day == lastTask!.date!.day) return null;
 
     //Generate new task
-    Task newTask = baseTask.clone();
+    Task newTask = baseTask.clone()..generateIdUUId();
     newTask.date = DateTime(
         today.year, today.month, today.day, this.date.hour, this.date.minute);
-    newTask.taskId = this.id;
+    newTask.generatorId = this.id;
     newTask.taskType = this;
     newTask.xp = this.xpPerTask;
     newTask.money = this.moneyPerTask;
@@ -318,7 +386,7 @@ class TaskTypeRepeatEveryDay extends TaskType {
   }
 
   @override
-  Task? generateGhostTask(Task baseTask, List<Task> oldTasks) {
+  Task? generateGhostTask(Task baseTask, Iterable<Task> oldTasks) {
     Task? lastTask;
 
     oldTasks
@@ -326,12 +394,12 @@ class TaskTypeRepeatEveryDay extends TaskType {
         .forEach((element) {
       if (lastTask == null &&
           element.date != null &&
-          element.taskId == this.id) {
+          element.generatorId == this.id) {
         lastTask = element;
       } else if (lastTask != null &&
           element.date != null &&
           lastTask!.date!.isBefore(element.date!) &&
-          element.taskId == this.id) {
+          element.generatorId == this.id) {
         lastTask = element;
       }
     });
@@ -349,7 +417,7 @@ class TaskTypeRepeatEveryDay extends TaskType {
     Task newTask = baseTask.clone();
     newTask.date = DateTime(tomorrow.year, tomorrow.month, tomorrow.day,
         this.date.hour, this.date.minute);
-    newTask.taskId = this.id;
+    newTask.generatorId = this.id;
     newTask.taskType = this;
     newTask.xp = this.xpPerTask;
     newTask.money = this.moneyPerTask;
@@ -445,13 +513,13 @@ class TaskTypeFailTask extends TaskType {
   }
 
   @override
-  Task? generate(Task _baseTask, List<Task> _oldTasks) {
+  Task? generate(Task _baseTask, Iterable<Task> _oldTasks) {
     return null;
   }
 
   Task generateFail(Task baseTask) {
-    Task newTask = baseTask.clone();
-    newTask.taskId = this.id;
+    Task newTask = baseTask.clone()..generateIdUUId();
+    newTask.generatorId = this.id;
     newTask.taskType = this;
     newTask.xp = this.xpPerTask;
     newTask.money = this.moneyPerTask;
@@ -461,7 +529,7 @@ class TaskTypeFailTask extends TaskType {
   }
 
   @override
-  Task? generateGhostTask(Task baseTask, List<Task> oldTasks) {
+  Task? generateGhostTask(Task baseTask, Iterable<Task> oldTasks) {
     return null;
   }
 }
@@ -471,50 +539,65 @@ class TaskWidget extends StatelessWidget {
       {Key? key,
       required this.task,
       this.ghost = false,
-      required this.taskChanged})
+      this.setState,
+      this.profile,
+      this.setLastTask,
+      this.man,
+      this.gens,
+      this.shortClick,
+      this.longClick})
       : super(key: key);
+
   final bool ghost;
   final Task task;
-  final ValueChanged<Task> taskChanged;
+
+  final Profile? profile;
+  final TaskManager? man;
+  final TaskGenerators? gens;
+
+  final void Function()? shortClick;
+  final void Function()? longClick;
+  final void Function(void Function())? setState;
+  final void Function(Task)? setLastTask;
 
   @override
   Widget build(BuildContext context) {
     var onPressed = () {
       var a = task;
-      //Treat if this is a ghost list item then it works diferently. A simple tap
-      //Will mark task as done
-      if (ghost) {
-        a.done = true;
-        taskChanged(a);
+      if (shortClick != null) {
+        shortClick!();
         return;
       }
-      a.done = !a.done;
-      taskChanged(a);
+      if (ghost) return;
+      if (gens == null || man == null || profile == null || setState == null)
+        return;
+      setState!(() {
+        a.toggle(gens!, man!, profile!);
+        if (setLastTask != null) setLastTask!(a);
+      });
     };
+
     var onLongPress = () {
       var a = task;
-      //Treat if this is a ghost list item then it works diferently. A long tap
-      //Will mark task as fail
-      if (ghost) {
-        a.fail = true;
-        taskChanged(a);
+      if (longClick != null) {
+        longClick!();
         return;
       }
+      if (ghost) return;
+      if (gens == null || man == null || profile == null || setState == null)
+        return;
 
-      if (!a.done) {
-        //Because its going from not done -> fail
-        a.directToFail = true;
-        a.done = true;
-        a.fail = true;
-      } else if (!a.fail) {
-        a.directToFail = false;
-        a.done = true;
-        a.fail = true;
-      } else {
-        onPressed();
-        return;
-      }
-      taskChanged(a);
+      setState!(() {
+        if (!a.done) {
+          a.taskFail(gens!, man!, profile!);
+        } else if (a.fail) {
+          a.deactivate(gens!, man!, profile!);
+        } else {
+          a.deactivate(gens!, man!, profile!);
+          a.taskFail(gens!, man!, profile!);
+        }
+        if (setLastTask != null) setLastTask!(a);
+      });
     };
 
     String date = ghost ? "Available " : '';
@@ -618,5 +701,158 @@ class TaskWidgetIcon extends StatelessWidget {
         child: icon != null ? Icon(icon) : null,
       ),
     );
+  }
+}
+
+class TaskGenerators {
+  TaskGenerators({required this.tasks});
+
+  Map<String, TaskGenerator> tasks;
+
+  factory TaskGenerators.fromJSON(Map<String, dynamic> json) {
+    Map<String, TaskGenerator> gens = {};
+
+    json.keys.forEach((e) {
+      try {
+        TaskGenerator gen = TaskGenerator.fromJson(json[e]);
+        if (gen.type.id == e) {
+          gens[e] = gen;
+        }
+      } catch (e) {
+        //TODO: Deal with the error in the future
+      }
+    });
+
+    return TaskGenerators(tasks: gens);
+  }
+
+  Map<String, dynamic> toJson() {
+    return this.tasks.map((key, value) => MapEntry(key, value.toJson()));
+  }
+
+  TaskGenerator? get(String id) {
+    if (id == "") return null;
+    if (!tasks.containsKey(id)) return null;
+    return tasks[id];
+  }
+
+  Iterable<TaskGenerator> get fail {
+    return tasks.keys
+        .where((a) => tasks[a]!.type is TaskTypeFailTask)
+        .map((a) => tasks[a]!);
+  }
+
+  void add(TaskGenerator a) {
+    tasks.putIfAbsent(a.type.id, () => tasks[a.type.id] = a);
+  }
+
+  List<Task> generate(TaskManager manager, Profile profile) {
+    List<Task> ghost = [];
+
+    List<String> toRemove = [];
+
+    print(this.tasks.values.length);
+
+    this.tasks.values.forEach((TaskGenerator e) {
+      manager.add(e.type.generate(e.base, manager.taskList));
+      Task? task = e.type.generateGhostTask(e.base, manager.taskList);
+      if (task != null) {
+        ghost.add(task);
+      }
+      if (e.type.finished()) {
+        toRemove.add(e.type.id);
+      }
+    });
+
+    toRemove.forEach((e) => this.tasks.remove(e));
+
+    return ghost;
+  }
+
+  Iterable<TaskGenerator> get lists {
+    return tasks.values;
+  }
+
+  void remove(TaskGenerator e, TaskManager manager) {
+    this.tasks.remove(e.type.id);
+    manager.removedActiveGenerator(e.type.id);
+  }
+}
+
+class TaskManager {
+  TaskManager(this.tasks, this.oldTasks);
+
+  Map<String, Task> tasks;
+  Map<String, Task> oldTasks;
+
+  Iterable<Task> get taskList {
+    return this.tasks.values;
+  }
+
+  Task? getTaskByIdUUID(String id) {
+    if (tasks.containsKey(id)) return tasks[id];
+    if (oldTasks.containsKey(id)) return oldTasks[id];
+    return null;
+  }
+
+  void add(Task? task) {
+    if (task == null) return;
+    print("here");
+    print("id: ${task.id}");
+    if (task.id == "") return;
+    tasks[task.id] = task;
+  }
+
+  void removeTask(Task? task) {
+    if (task == null) return;
+    if (tasks.containsKey(task.id)) {
+      tasks.remove(task.id);
+    }
+    if (oldTasks.containsKey(task.id)) {
+      oldTasks.remove(task.id);
+    }
+  }
+
+  Map<String, dynamic> toJSON() {
+    return {
+      "tasks": this.tasks.map((key, value) => MapEntry(key, value.toJSON())),
+      "oldTasks":
+          this.oldTasks.map((key, value) => MapEntry(key, value.toJSON())),
+    };
+  }
+
+  Iterable<Task> get active {
+    return this
+        .tasks
+        .keys
+        .where((element) => !this.tasks[element]!.done)
+        .map((e) => this.tasks[e]!);
+  }
+
+  void removedActiveGenerator(String id) {
+    List<String> toRemove = [];
+    this.active.forEach((element) {
+      if (element.generatorId == id) toRemove.add(element.id);
+    });
+
+    toRemove.forEach((element) => this.tasks.remove(element));
+  }
+
+  //TODO load old tasks
+  factory TaskManager.fromJSON(Map<String, dynamic> json) {
+    Map<String, Task> map = {};
+
+    json.keys.forEach((e) {
+      try {
+        Task task = Task.fromJson(json[e]);
+        if (e == task.id) {
+          map[e] = task;
+        }
+      } catch (e) {
+        //TODO deal with the error
+      }
+    });
+
+    return TaskManager(map, {});
   }
 }

@@ -2,7 +2,8 @@ import 'package:app/Task.dart';
 import 'package:app/Utils.dart';
 import 'package:flutter/material.dart';
 
-void showItemsDialog(BuildContext context, List<Tuple<int, Task>> list,
+//TODO
+/*void showItemsDialog(BuildContext context, List<Tuple<int, Task>> list,
     Function taskChanged, Function onClose) {
   // Only takes from this month
   list.sort((a, b) {
@@ -45,4 +46,4 @@ void showItemsDialog(BuildContext context, List<Tuple<int, Task>> list,
       builder: (b) {
         return dialog;
       }).then((_) => onClose());
-}
+}*/

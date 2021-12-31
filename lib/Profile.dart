@@ -57,7 +57,7 @@ class ProfileWidget extends StatelessWidget {
                 children: this.taskGenerators.map((e) {
                   return TaskWidget(
                     task: e.base,
-                    taskChanged: (t) {
+                    shortClick: () {
                       showAlertDialog(
                           context,
                           'Are you sure you want to remove this task!',
@@ -100,6 +100,26 @@ class Profile {
   int getLevelXp() {
     //TODO: Analize because level starts at 0 and maybe it should start at 1
     return 100 + this.level.abs() * 200;
+  }
+
+  completeTask(Task t) {
+    addXp(t.xp);
+    money += t.money;
+  }
+
+  removeWinnings(Task t) {
+    removeXP(t.xp);
+    money -= t.money;
+  }
+
+  taskFail(Task t) {
+    removeXP(t.xp + t.xpLost);
+    money -= (t.money + t.moneyLost);
+  }
+
+  removeDamages(Task t) {
+    addXp(t.xp + t.xpLost);
+    money += (t.money + t.moneyLost);
   }
 
   addXp(double xp) {

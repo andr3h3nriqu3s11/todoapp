@@ -16,6 +16,7 @@ import 'package:path/path.dart';
 import 'package:timezone/data/latest.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/standalone.dart' as tz;
+import 'package:uuid/uuid.dart';
 
 import 'Utils.dart';
 
@@ -65,11 +66,10 @@ class _MyHomePageState extends State<MyHomePage> {
   Profile? profile;
   bool isProfileCreated = false;
   //  Tasks:
-  List<TaskGenerator> taskGenerators = [];
-  List<Task> tasks = [];
-  List<Task> oldTasks = [];
-  List<Tuple<Task, TaskGenerator>> ghostTasks = [];
-  Tuple<int, Task>? lastTaskDone;
+  TaskGenerators? generators;
+  TaskManager? manager;
+  List<Task> ghostTasks = [];
+  Task? lastTaskDone;
   Tuple<TaskGenerator, Offset>? dragTaskGenerator;
 
   List<Tuple<int, Task>> deletedTasksNotification = [];
@@ -78,24 +78,6 @@ class _MyHomePageState extends State<MyHomePage> {
   // Secound Page limit
   int limit = 0;
   ScrollController? _scrollController;
-
-  Future<List<Task>> loadTaskFromDb(String recordName) async {
-    if (await store!.record(recordName).exists(db!)) {
-      try {
-        return (((await store!.record(recordName).get(db!)) as List<dynamic>)
-            .map((e) => Task.fromJson(e))
-            .toList());
-      } catch (e) {
-        //TODO: Deal with error waring
-        print("Failed to process tasks: " + e.toString());
-        await store!.record(recordName).delete(db!);
-        //throw new Error();
-        //TODO maybe throw error
-        return [];
-      }
-    }
-    return [];
-  }
 
   //Set up Load Database
   Future startDb() async {
@@ -108,72 +90,54 @@ class _MyHomePageState extends State<MyHomePage> {
     this.db = await dbFactory.openDatabase(dbPath);
     this.store = StoreRef.main();
 
+    TaskManager? man;
+    TaskGenerators? gens;
+    Profile profile = Profile(level: 0, money: 0, xp: 0, name: '');
+    bool isProfileCreated = false;
+
     //Load data from database
     //  Loading data for user
     if (await store!.record('profile').exists(db!)) {
-      var tempProfile =
-          Profile.fromJson(await store!.record('profile').get(db!));
-      setState(() {
-        profile = tempProfile;
-        isProfileCreated = true;
-      });
-    } else {
-      setState(() {
-        profile = Profile(level: 0, money: 0, xp: 0, name: '');
-      });
-    }
-
-    List<Task> tempTasks = await loadTaskFromDb('tasks');
-    List<Task> tempOldTasks = await loadTaskFromDb('oldTasks');
-    setState(() {
-      tasks = tempTasks;
-      oldTasks = tempOldTasks;
-    });
-
-    if (await store!.record('tasksGenerators').exists(db!)) {
       try {
-        List<TaskGenerator> tempTaskGenerators = (((await store!
-                .record('tasksGenerators')
-                .get(db!)) as List<dynamic>)
-            .map((e) => TaskGenerator.fromJson(e))
-            .toList());
-        setState(() {
-          taskGenerators = tempTaskGenerators;
-        });
+        profile = Profile.fromJson(await store!.record('profile').get(db!));
+        isProfileCreated = true;
       } catch (e) {
-        //TODO: Deal with error waring
-        print("Failed to process tasks generators: " + e.toString());
-        await store!.record('tasksGenerators').delete(db!);
-        setState(() {
-          taskGenerators = [];
-        });
+        //TODO deal with the error
       }
-    } else {
-      setState(() {
-        taskGenerators = [];
-      });
     }
+
+    if (await store!.record("tasks").exists(db!))
+      try {
+        man = TaskManager.fromJSON(
+            await store!.record('tasks').get(db!) as Map<String, dynamic>);
+      } catch (e) {
+        await store!.record('tasks').delete(db!);
+      }
+
+    if (await store!.record('tasksGenerators').exists(db!))
+      try {
+        gens = TaskGenerators.fromJSON(
+            (await store!.record('tasksGenerators').get(db!)));
+      } catch (e) {
+        await store!.record('tasksGenerators').delete(db!);
+      }
 
     setState(() {
       loaded = true;
+      this.manager = man ?? TaskManager({}, {});
+      this.generators = gens ?? TaskGenerators(tasks: {});
+      this.profile = profile;
+      this.isProfileCreated = isProfileCreated;
       generateTasks(null);
     });
   }
 
   Future saveDb() async {
-    //TODO: improve
-    // probably add a tost
+    //TODO: improve probably add a tost
     if (store == null || db == null) return;
     await store!.record('profile').put(db!, profile!.toJson());
-    await store!
-        .record('oldTasks')
-        .put(db!, oldTasks.map((e) => e.toJSON()).toList());
-    await store!
-        .record('tasks')
-        .put(db!, tasks.map((e) => e.toJSON()).toList());
-    await store!
-        .record('tasksGenerators')
-        .put(db!, taskGenerators.map((e) => e.toJson()).toList());
+    await store!.record('tasks').put(db!, manager!.toJSON());
+    await store!.record('tasksGenerators').put(db!, generators!.toJson());
   }
 
   @override
@@ -218,69 +182,65 @@ class _MyHomePageState extends State<MyHomePage> {
   Future checkTasks(BuildContext? context) async {
     tz.Location location =
         tz.getLocation(await FlutterNativeTimezone.getLocalTimezone());
-    int index = 0;
-    var t = [...tasks];
-    for (var task in t) {
-      index++;
-      if (!task.done) {
-        if ((task.taskType is TaskTypeOnce ||
-                task.taskType is TaskTypeRepeatEveryDay ||
-                task.taskType is TaskTypeFailTask) &&
-            generalNotificationDetails != null) {
-          //Check the task
-          //If the task is already past the time and was not recoverd by the user
-          // then marked it as failed
-          if (task.date!.isBefore(DateTime.now())) {
-            // If the user did not change this to the fail position then
-            // change to a failed notification
-            if (!task.userRemovedFromFail) {
-              task.done = true;
-              task.fail = true;
-              task.directToFail = true;
-              //Call the task changed function to deal with the points
-              taskChanged(index, context)(task);
-              setState(() {
-                deletedTasksNotification.add(Tuple(k: index, t: task));
-              });
-            }
-          } else if (task.date!
-              .subtract(Duration(minutes: 15))
-              .isBefore(DateTime.now())) {
-            // Create a notification
-            if (task.notificationId != null)
-              localNotification.cancel(task.notificationId!);
-            //TODO improve this
-            task.notificationId = new Random().nextInt(100000000);
-            localNotification.show(
-                task.notificationId!,
-                "A task needs to be done",
-                "The Task: " + task.title + " needs to be completed.",
-                generalNotificationDetails!);
-          } else {
-            // Create a notification
-            if (task.notificationId != null)
-              localNotification.cancel(task.notificationId!);
-            //TODO improve this
-            task.notificationId = new Random().nextInt(100000000);
 
-            var date = tz.TZDateTime.from(
-                task.date!.subtract(Duration(minutes: 15)), location);
-
-            localNotification.zonedSchedule(
-                task.notificationId!,
-                "A task needs to be done",
-                "The task: " + task.title + " needs to be completed.",
-                date,
-                generalNotificationDetails!,
-                uiLocalNotificationDateInterpretation:
-                    UILocalNotificationDateInterpretation.absoluteTime,
-                androidAllowWhileIdle: true);
+    manager!.active.forEach((task) {
+      if ((task.taskType is TaskTypeOnce ||
+              task.taskType is TaskTypeRepeatEveryDay ||
+              task.taskType is TaskTypeFailTask) &&
+          generalNotificationDetails != null) {
+        //Check the task
+        //If the task is already past the time and was not recoverd by the user
+        // then marked it as failed
+        if (task.date!.isBefore(DateTime.now())) {
+          // If the user did not change this to the fail position then
+          // change to a failed notification
+          if (!task.userRemovedFromFail) {
+            //Call the fail function to deal with the points
+            task.taskFail(generators!, manager!, profile!);
+            //TODO: add the fail tasks
+            /*setState(() {
+              deletedTasksNotification.add(Tuple(k: index, t: task));
+            });*/
           }
+        } else if (task.date!
+            .subtract(Duration(minutes: 15))
+            .isBefore(DateTime.now())) {
+          // Create a notification
+          if (task.notificationId != null)
+            localNotification.cancel(task.notificationId!);
+
+          task.notificationId = Uuid().v1().hashCode;
+
+          localNotification.show(
+              task.notificationId!,
+              "A task needs to be done",
+              "The Task: " + task.title + " needs to be completed.",
+              generalNotificationDetails!);
+        } else {
+          // Create a notification
+          if (task.notificationId != null)
+            localNotification.cancel(task.notificationId!);
+
+          task.notificationId = new Random().nextInt(100000000);
+
+          var date = tz.TZDateTime.from(
+              task.date!.subtract(Duration(minutes: 15)), location);
+
+          localNotification.zonedSchedule(
+              task.notificationId!,
+              "A task needs to be done",
+              "The task: " + task.title + " needs to be completed.",
+              date,
+              generalNotificationDetails!,
+              uiLocalNotificationDateInterpretation:
+                  UILocalNotificationDateInterpretation.absoluteTime,
+              androidAllowWhileIdle: true);
         }
       }
-    }
+    });
 
-    if (context != null &&
+    //TODO deal with the message
+    /*if (context != null &&
         deletedTasksNotification.length > 0 &&
         deletedTasksShown) {
       setState(() {
@@ -292,7 +252,7 @@ class _MyHomePageState extends State<MyHomePage> {
           deletedTasksNotification = [];
         });
       });
-    }
+    }*/
 
     /*DateTime nowTime = new DateTime.now();
 
@@ -317,14 +277,9 @@ class _MyHomePageState extends State<MyHomePage> {
         context,
         MaterialPageRoute(
             builder: (context) => EditNewItemRoute(
-                  failTasksGenerators: this
-                      .taskGenerators
-                      .where((element) => element.type is TaskTypeFailTask)
-                      .toList(),
+                  failTasksGenerators: this.generators!.fail.toList(),
                   newTaskGenerator: (TaskGenerator task) async {
-                    setState(() {
-                      taskGenerators.add(task);
-                    });
+                    generators!.add(task);
                     await this.saveDb();
                     Navigator.pop(context);
                     generateTasks(context);
@@ -332,92 +287,13 @@ class _MyHomePageState extends State<MyHomePage> {
                 )));
   }
 
-  //! Note: this function calls a function that saves the db
   //! Note: this function calls the checkTasks function
   void generateTasks(BuildContext? context) {
-    List<TaskGenerator> t = [];
-    List<Tuple<Task, TaskGenerator>> ghostTasksNew = [];
-    for (var a in taskGenerators) {
-      var generated = a.type.generate(a.base, tasks);
-      if (generated != null) tasks.add(generated);
-      var generatedGhost = a.type.generateGhostTask(a.base, tasks);
-      if (generatedGhost != null)
-        ghostTasksNew.add(Tuple(k: generatedGhost, t: a));
-
-      if (!a.type.finished()) t.add(a);
-    }
     setState(() {
-      taskGenerators = t;
-      ghostTasks = ghostTasksNew;
+      ghostTasks = generators!.generate(manager!, profile!);
     });
     localNotification.cancelAll();
     checkTasks(context);
-  }
-
-  //! Note: When removing from fail only change to task.done to false
-  //! Note: This function saves the db
-  taskChanged(int index, BuildContext? context) {
-    return (Task task) {
-      // something -> Fail -> not done
-      // The xp points and the money need to be restored
-      // something is defined by the directToFail if its true
-      //  then the task was failed without completing it first
-      if (task.fail && !task.done) {
-        task.userRemovedFromFail = true;
-        task.fail = false;
-        setState(() {
-          //Restore the money and xp that is lost when a quest is failed
-          this.profile!.addXp(task.xpLost);
-          this.profile!.money += task.moneyLost;
-        });
-        //This needs to be done after the removal because this is needed by the process of removal
-        task.directToFail = false;
-        setState(() {
-          tasks[index] = task;
-          if (lastTaskDone != null && lastTaskDone!.k == index) {
-            lastTaskDone = null;
-          }
-        });
-        generateTasks(context);
-        return;
-      }
-
-      setState(() {
-        //Task faild
-        if (task.done && task.fail) {
-          //If the task is directToFail then you only remove the fail xp/money
-          // If not the you remove the fail xp/money and the gain xp
-          this.profile!.removeXP(task.xpLost);
-          this.profile!.money -= task.moneyLost;
-          if (!task.directToFail) {
-            this.profile!.removeXP(task.xp);
-            this.profile!.money -= task.money;
-          }
-          lastTaskDone = Tuple(k: index, t: task);
-          task.taskAddedPoints = false;
-        } else if (task.done) {
-          if (task.notificationId != null)
-            localNotification.cancel(task.notificationId!);
-          generateTasks(context);
-          this.profile!.addXp(task.xp);
-          this.profile!.money += task.money;
-          lastTaskDone = Tuple(k: index, t: task);
-          task.taskAddedPoints = true;
-        }
-        if (lastTaskDone != null && lastTaskDone!.k == index && !task.done) {
-          lastTaskDone = null;
-        }
-
-        // done -> not done
-        if (!task.done && task.taskAddedPoints && !task.fail) {
-          task.taskAddedPoints = false;
-          this.profile!.removeXP(task.xp);
-          this.profile!.money -= task.money;
-        }
-        tasks[index] = task;
-      });
-      generateTasks(context);
-    };
   }
 
   void _changePage(int index) {
@@ -432,30 +308,35 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Widget _buildDoneTask(BuildContext context) {
-    //Get rigth taks
-    int index = 0;
-
     //Create Widgets out of it
-    List<Tuple<int, Task>> taskTuples = tasks
-        .map((Task e) => Tuple(k: index++, t: e))
-        .where((Tuple t) => t.t.done)
-        .toList();
+    List<Task> tasks = manager!.taskList.where((e) => e.done).toList()
+      ..sort((a, b) {
+        if (a.date == null && b.date == null) return 0;
+        if (a.date == null) return 1;
+        if (b.date == null) return -1;
+        return b.date!.compareTo(a.date!);
+      });
 
-    // Only takes from this month
+    DateTime t = DateTime.now();
 
-    taskTuples.sort((a, b) {
-      if (a.t.date == null && b.t.date == null) return 0;
-      if (a.t.date == null) return 1;
-      if (b.t.date == null) return -1;
-      return b.t.date!.compareTo(a.t.date!);
-    });
-
-    DateTime t = new DateTime.now();
-
-    List<Widget> taskWidgets = taskTuples
-        .where((e) => e.t.date!.month >= t.month)
-        .map((t) =>
-            TaskWidget(task: t.t, taskChanged: taskChanged(t.k, context)))
+    List<Widget> taskWidgets = tasks
+        //TODO improve this
+        //Only take from this month
+        .where((e) => e.date!.month >= t.month)
+        //Transform to widgets
+        .map((task) => TaskWidget(
+              task: task,
+              profile: profile,
+              man: manager,
+              gens: generators,
+              setState: setState,
+              setLastTask: (Task a) {
+                setState(() {
+                  lastTaskDone = !a.done ? null : a;
+                });
+                generateTasks(context);
+              },
+            ))
         .toList();
 
     // Return content for the page
@@ -483,69 +364,64 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Widget _buildToDoTask(BuildContext context) {
-    //Get rigth taks
-    int index = 0;
+    //Create Widgets out of it
+    List<Task> tasks = manager!.active.toList()
+      ..sort((a, b) {
+        if (a.date == null && b.date == null) return 0;
+        if (a.date == null) return -1;
+        if (b.date == null) return 1;
+        return a.date!.compareTo(b.date!);
+      });
+
+    List<Widget> taskWidgets = tasks
+        .map((t) => TaskWidget(
+              task: t,
+              man: manager,
+              gens: generators,
+              profile: profile,
+              setState: setState,
+              setLastTask: (a) {
+                setState(() {
+                  lastTaskDone = !a.done ? null : a;
+                });
+                generateTasks(context);
+              },
+            ))
+        .toList();
 
     //Create Widgets out of it
-    List<Tuple<int, Task>> taskTuples = tasks
-        .map((Task e) => Tuple(k: index++, t: e))
-        .where((Tuple t) => !t.t.done)
-        .toList();
-    taskTuples.sort((a, b) {
-      if (a.t.date == null && b.t.date == null) return 0;
-      if (a.t.date == null) return -1;
-      if (b.t.date == null) return 1;
-      return a.t.date!.compareTo(b.t.date!);
-    });
-    List<Widget> taskWidgets = taskTuples
-        .map((t) =>
-            TaskWidget(task: t.t, taskChanged: taskChanged(t.k, context)))
-        .toList();
-
-    //Create Widgets out of it
-    //TODO: improve
-    //TODO: Add the rigth function with taskChanged to disable the task generator
+    //! Note: not needed to disable it here since it can be disable on the profile page
     ghostTasks.sort((a, b) {
-      if (a.k.date == null && b.k.date == null) return 0;
-      if (a.k.date == null) return -1;
-      if (b.k.date == null) return 1;
-      return a.k.date!.compareTo(b.k.date!);
+      if (a.date == null && b.date == null) return 0;
+      if (a.date == null) return -1;
+      if (b.date == null) return 1;
+      return a.date!.compareTo(b.date!);
     });
 
     List<Widget> taskGhost = ghostTasks
-        .where((var t) => !t.k.done)
+        .where((var t) => !t.done)
         .map((t) => GestureDetector(
             onHorizontalDragStart: (DragStartDetails e) {
-              dragTaskGenerator = Tuple(k: t.t, t: e.globalPosition);
+              //TODO
+              //dragTaskGenerator = Tuple(k: t, t: e.globalPosition);
             },
             onHorizontalDragUpdate: (DragUpdateDetails e) {
-              if (dragTaskGenerator != null &&
-                  dragTaskGenerator!.k.base.taskId == t.k.taskId) {
+              //TODO
+              /*if (dragTaskGenerator != null &&
+                  dragTaskGenerator!.k.base.generatorId == t.k.generatorId) {
                 //TODO drag animation
-              }
+              }*/
             },
             onHorizontalDragEnd: (DragEndDetails e) {
-              if (dragTaskGenerator != null &&
-                  dragTaskGenerator!.k.base.taskId == t.k.taskId) {
+              //TODO
+              /*if (dragTaskGenerator != null &&
+                  dragTaskGenerator!.k.base.generatorId == t.k.generatorId) {
                 //TODO drag action
-              }
+              }*/
             },
             child: TaskWidget(
               ghost: true,
-              task: t.k,
-              taskChanged: (Task tas) {
-                if (tas.fail) {
-                  showAlertDialog(
-                      context,
-                      "Do you want to remove ${tas.title}?",
-                      "Are you sure?", () {
-                    taskGenerators.remove(t.t);
-                    ghostTasks.remove(t.k);
-                    //Note no need to save the db as this function will save the db
-                    generateTasks(context);
-                  }, () {});
-                }
-              },
+              task: t,
             )))
         .toList();
 
@@ -618,8 +494,18 @@ class _MyHomePageState extends State<MyHomePage> {
               ],
             ),
             TaskWidget(
-                task: lastTaskDone!.t,
-                taskChanged: taskChanged(lastTaskDone!.k, context))
+              task: lastTaskDone!,
+              profile: profile,
+              man: manager,
+              gens: generators,
+              setState: setState,
+              setLastTask: (Task a) {
+                setState(() {
+                  lastTaskDone = !a.done ? null : a;
+                });
+                generateTasks(context);
+              },
+            )
           ],
         )
     ]);
@@ -659,23 +545,11 @@ class _MyHomePageState extends State<MyHomePage> {
                     profile: this.profile!,
                     removeTaskGenerator: (TaskGenerator e) {
                       setState(() {
-                        this.taskGenerators = this
-                            .taskGenerators
-                            .where((element) => element != e)
-                            .toList();
-                        this.tasks = this.tasks.where((element) {
-                          if (element.taskType != null) {
-                            if (element.taskType!.id == e.type.id &&
-                                !element.done) {
-                              return false;
-                            }
-                          }
-                          return true;
-                        }).toList();
+                        generators!.remove(e, manager!);
                       });
                       this.saveDb();
                     },
-                    taskGenerators: this.taskGenerators,
+                    taskGenerators: generators!.lists.toList(),
                     //TODO: Improve this
                     logOut: () {
                       setState(() {
@@ -685,8 +559,8 @@ class _MyHomePageState extends State<MyHomePage> {
                         this.store!.record('taks').delete(this.db!);
                         this.store!.record('taskGenerators').delete(this.db!);
                         isProfileCreated = false;
-                        tasks = [];
-                        taskGenerators = [];
+                        manager = TaskManager({}, {});
+                        generators = TaskGenerators(tasks: {});
                         ghostTasks = [];
                         lastTaskDone = null;
                       });

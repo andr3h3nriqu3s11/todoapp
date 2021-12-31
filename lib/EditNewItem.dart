@@ -83,7 +83,7 @@ class _EditNewItemState extends State<EditNewItem> {
 
     _formKey.currentState!.save();
 
-    Task t = Task(title: _name, taskId: Uuid().v1());
+    Task t = Task(title: _name, id: "");
     TaskType? taskType;
     if (_taskTypeValue == 1) {
       taskType = TaskTypeOnce(
