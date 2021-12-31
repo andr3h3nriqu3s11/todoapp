@@ -1,20 +1,24 @@
+import 'package:app/Profile.dart';
 import 'package:app/Task.dart';
-import 'package:app/Utils.dart';
 import 'package:flutter/material.dart';
 
-//TODO
-/*void showItemsDialog(BuildContext context, List<Tuple<int, Task>> list,
-    Function taskChanged, Function onClose) {
+void showItemsDialog(BuildContext context, List<Task> list, TaskManager man,
+    TaskGenerators gens, Profile profile, Function onClose) {
   // Only takes from this month
   list.sort((a, b) {
-    if (a.t.date == null && b.t.date == null) return 0;
-    if (a.t.date == null) return 1;
-    if (b.t.date == null) return -1;
-    return b.t.date!.compareTo(a.t.date!);
+    if (a.date == null && b.date == null) return 0;
+    if (a.date == null) return 1;
+    if (b.date == null) return -1;
+    return b.date!.compareTo(a.date!);
   });
 
   List<Widget> taskWidgets = list
-      .map((t) => TaskWidget(task: t.t, taskChanged: taskChanged(t.k, context)))
+      .map((t) => TaskWidget(
+            task: t,
+            man: man,
+            gens: gens,
+            profile: profile,
+          ))
       .toList();
 
   Widget okBtt = TextButton(
@@ -46,4 +50,4 @@ import 'package:flutter/material.dart';
       builder: (b) {
         return dialog;
       }).then((_) => onClose());
-}*/
+}

@@ -1,11 +1,6 @@
 import 'dart:math';
 
-import 'package:app/BoxHolder.dart';
-import 'package:app/DialogDeletedItems.dart';
-import 'package:app/EditNewItem.dart';
-import 'package:app/Profile.dart';
-import 'package:app/Start.dart';
-import 'package:app/Task.dart';
+import 'package:app/TaskTypes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
@@ -18,6 +13,12 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/standalone.dart' as tz;
 import 'package:uuid/uuid.dart';
 
+import 'package:app/BoxHolder.dart';
+import 'package:app/DialogDeletedItems.dart';
+import 'package:app/EditNewItem.dart';
+import 'package:app/Profile.dart';
+import 'package:app/Start.dart';
+import 'package:app/Task.dart';
 import 'Utils.dart';
 
 void main() async {
@@ -56,23 +57,24 @@ class _MyHomePageState extends State<MyHomePage> {
 
   // Things to be used by the page
   int _selectedIndex = 0;
-  bool loaded = false;
 
   //Local Database
+  bool loaded = false;
   Database? db;
   StoreRef? store;
 
   //User Data
   Profile? profile;
   bool isProfileCreated = false;
-  //  Tasks:
+
+  //Tasks:
   TaskGenerators? generators;
   TaskManager? manager;
   List<Task> ghostTasks = [];
   Task? lastTaskDone;
   Tuple<TaskGenerator, Offset>? dragTaskGenerator;
 
-  List<Tuple<int, Task>> deletedTasksNotification = [];
+  List<Task> deletedTasksNotification = [];
   bool deletedTasksShown = false;
 
   // Secound Page limit
@@ -197,10 +199,9 @@ class _MyHomePageState extends State<MyHomePage> {
           if (!task.userRemovedFromFail) {
             //Call the fail function to deal with the points
             task.taskFail(generators!, manager!, profile!);
-            //TODO: add the fail tasks
-            /*setState(() {
-              deletedTasksNotification.add(Tuple(k: index, t: task));
-            });*/
+            setState(() {
+              deletedTasksNotification.add(task);
+            });
           }
         } else if (task.date!
             .subtract(Duration(minutes: 15))
@@ -221,7 +222,7 @@ class _MyHomePageState extends State<MyHomePage> {
           if (task.notificationId != null)
             localNotification.cancel(task.notificationId!);
 
-          task.notificationId = new Random().nextInt(100000000);
+          task.notificationId = Uuid().v1().hashCode;
 
           var date = tz.TZDateTime.from(
               task.date!.subtract(Duration(minutes: 15)), location);
@@ -238,21 +239,6 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       }
     });
-
-    //TODO deal with the message
-    /*if (context != null &&
-        deletedTasksNotification.length > 0 &&
-        deletedTasksShown) {
-      setState(() {
-        deletedTasksShown = true;
-      });
-      showItemsDialog(context, deletedTasksNotification, taskChanged, () {
-        setState(() {
-          deletedTasksShown = false;
-          deletedTasksNotification = [];
-        });
-      });
-    }*/
 
     /*DateTime nowTime = new DateTime.now();
 
@@ -532,6 +518,20 @@ class _MyHomePageState extends State<MyHomePage> {
               this.store!.record("profile").put(this.db!, p.toJson());
             });
           });
+    }
+
+    if (deletedTasksNotification.length > 0 && deletedTasksShown) {
+      setState(() {
+        deletedTasksShown = true;
+      });
+      showItemsDialog(
+          context, deletedTasksNotification, manager!, generators!, profile!,
+          () {
+        setState(() {
+          deletedTasksShown = false;
+          deletedTasksNotification = [];
+        });
+      });
     }
 
     //Return the main app
