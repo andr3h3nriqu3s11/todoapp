@@ -136,8 +136,11 @@ class Task {
           TaskTypeFailTask gen = taskGen.type as TaskTypeFailTask;
           Task task = gen.generateFail(taskGen.base);
           taskMan.add(task);
+          generatedIds.add(task.id);
         }
       });
+
+      this.generatedFailIds = generatedIds;
     }
 
     profile.taskFail(this);
@@ -463,8 +466,6 @@ class TaskManager {
 
   void add(Task? task) {
     if (task == null) return;
-    print("here");
-    print("id: ${task.id}");
     if (task.id == "") return;
     tasks[task.id] = task;
   }
@@ -510,23 +511,21 @@ class TaskManager {
 
     json["tasks"].keys.forEach((e) {
       try {
-        Task task = Task.fromJson(json[e]);
-        if (e == task.id) {
-          tasks[e] = task;
-        }
+        Task task = Task.fromJson(json['tasks'][e]);
+        if (e == task.id) tasks[e] = task;
       } catch (e) {
         //TODO deal with the error
+        print(e);
       }
     });
 
     json["oldTasks"].keys.forEach((e) {
       try {
-        Task task = Task.fromJson(json[e]);
-        if (e == task.id) {
-          oldTasks[e] = task;
-        }
+        Task task = Task.fromJson(json['oldTasks'][e]);
+        if (e == task.id) oldTasks[e] = task;
       } catch (e) {
         //TODO deal with the error
+        print(e);
       }
     });
 

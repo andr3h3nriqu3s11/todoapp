@@ -179,7 +179,6 @@ class _MyHomePageState extends State<MyHomePage> {
     startDb();
   }
 
-  //TODO implet a dialog that shows the items that were auto failed
   //! Note: This function saves the db
   Future checkTasks(BuildContext? context) async {
     tz.Location location =
@@ -524,14 +523,15 @@ class _MyHomePageState extends State<MyHomePage> {
       setState(() {
         deletedTasksShown = true;
       });
-      showItemsDialog(
-          context, deletedTasksNotification, manager!, generators!, profile!,
-          () {
-        setState(() {
-          deletedTasksShown = false;
-          deletedTasksNotification = [];
-        });
-      });
+      Future.delayed(
+          Duration.zero,
+          () => showItemsDialog(context, deletedTasksNotification, manager!,
+                  generators!, profile!, () {
+                setState(() {
+                  deletedTasksShown = false;
+                  deletedTasksNotification = [];
+                });
+              }));
     }
 
     //Return the main app

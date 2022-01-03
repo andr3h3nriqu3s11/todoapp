@@ -380,6 +380,12 @@ class _EditNewItemState extends State<EditNewItem> {
       );
     }).toList();
 
+    if (failTaskList.length == 0 && this.failTasksIds.length == 0)
+      return Padding(
+        padding: EdgeInsets.all(10),
+        child: Text("No Fail Task"),
+      );
+
     return Row(
       children: [
         SizedBox(
@@ -416,31 +422,41 @@ class _EditNewItemState extends State<EditNewItem> {
             ),
             //List
             SizedBox(
-                height: min(failTasksIds.length, 4) * 20,
-                child: SingleChildScrollView(
-                    child: Column(
-                  children: this.failTasksIds.map((e) {
-                    return SizedBox(
-                        height: 10,
-                        child: Row(
-                          children: [
-                            // Title
-                            Expanded(child: Text(e.base.title)),
-                            // Remove Button
-                            IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    this.failTasksIds = this
-                                        .failTasksIds
-                                        .where((element) => element != e)
-                                        .toList();
-                                  });
-                                },
-                                icon: Icon(Icons.minimize_outlined))
-                          ],
-                        ));
-                  }).toList(),
-                ))),
+                height: min(failTasksIds.length, 4) * 40 + 20,
+                child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: SingleChildScrollView(
+                        child: Column(
+                      children: this.failTasksIds.map((e) {
+                        return SizedBox(
+                            height: 40,
+                            child: Row(
+                              children: [
+                                // Title
+                                Expanded(
+                                    child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                      Text(
+                                        e.base.title,
+                                      )
+                                    ])),
+                                // Remove Button
+                                IconButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        this.failTasksIds = this
+                                            .failTasksIds
+                                            .where((element) => element != e)
+                                            .toList();
+                                      });
+                                    },
+                                    icon: Icon(Icons.minimize_outlined)),
+                              ],
+                            ));
+                      }).toList(),
+                    )))),
           ],
         )),
       ],
