@@ -84,7 +84,9 @@ class _EditNewItemState extends State<EditNewItem> {
 
     _formKey.currentState!.save();
 
-    Task t = Task(title: _name, id: "");
+    Task t = Task.emptyTask();
+    t.title = _name;
+    t.failTasks = this.failTasksIds.map((a) => a.type.id).toList();
     TaskType? taskType;
     if (_taskTypeValue == 1) {
       taskType = TaskTypeOnce(
@@ -97,6 +99,7 @@ class _EditNewItemState extends State<EditNewItem> {
           moneyLost: this.moneyLost,
           moneyPerTask: this.moneyPerTask,
           moneyPerTaskCombo: this.moneyPerTaskCombo);
+      t.generatorType = TaskTypeEnum.once;
     } else if (_taskTypeValue == 2) {
       taskType = TaskTypeRepeatEveryDay(
         xpPerTask: this.xpPerTask,
@@ -108,6 +111,7 @@ class _EditNewItemState extends State<EditNewItem> {
         date: DateTime(2020, 1, 1, _onceTime.hour, _onceTime.minute),
         id: Uuid().v1(),
       );
+      t.generatorType = TaskTypeEnum.repeat;
     } else if (_taskTypeValue == 3) {
       // Fail Task Case do this if the test fails
       taskType = TaskTypeFailTask(
@@ -120,6 +124,7 @@ class _EditNewItemState extends State<EditNewItem> {
         moneyPerTaskCombo: this.moneyPerTaskCombo,
         id: Uuid().v1(),
       );
+      t.generatorType = TaskTypeEnum.fail;
     } else
       return null;
 
@@ -213,7 +218,17 @@ class _EditNewItemState extends State<EditNewItem> {
     );
   }
 
+  // Points gained or losed when the player completes or fails the task
   Widget _buildPlayerActions() {
+    var validator = (String? v) {
+      if (v == null || v.isEmpty) return 'This filed must have a value';
+      try {
+        double.parse(v);
+      } catch (_) {
+        return 'This filed must be a number';
+      }
+    };
+
     return Container(
         margin: EdgeInsets.only(top: 10),
         decoration: BoxDecoration(color: Colors.white, boxShadow: [
@@ -238,15 +253,11 @@ class _EditNewItemState extends State<EditNewItem> {
                                 child: TextFormField(
                               decoration:
                                   InputDecoration(labelText: 'Xp once done'),
-                              validator: (String? v) {
-                                if (v == null || v.isEmpty)
-                                  return 'This filed must have a value';
-                                try {
-                                  double.parse(v);
-                                } catch (_) {
-                                  return 'This filed must be a number';
-                                }
-                              },
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
+                              validator: validator,
                               onSaved: (String? v) {
                                 if (v == null || v.isEmpty) return;
                                 xpPerTask = double.parse(v);
@@ -260,15 +271,11 @@ class _EditNewItemState extends State<EditNewItem> {
                                 child: TextFormField(
                               decoration:
                                   InputDecoration(labelText: 'Xp combo'),
-                              validator: (String? v) {
-                                if (v == null || v.isEmpty)
-                                  return 'This filed must have a value';
-                                try {
-                                  double.parse(v);
-                                } catch (_) {
-                                  return 'This filed must be a number';
-                                }
-                              },
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
+                              validator: validator,
                               onSaved: (String? v) {
                                 if (v == null || v.isEmpty) return;
                                 xpPerTaskCombo = double.parse(v);
@@ -284,15 +291,11 @@ class _EditNewItemState extends State<EditNewItem> {
                                 child: TextFormField(
                               decoration:
                                   InputDecoration(labelText: 'Money once done'),
-                              validator: (String? v) {
-                                if (v == null || v.isEmpty)
-                                  return 'This filed must have a value';
-                                try {
-                                  double.parse(v);
-                                } catch (_) {
-                                  return 'This filed must be a number';
-                                }
-                              },
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
+                              validator: validator,
                               onSaved: (String? v) {
                                 if (v == null || v.isEmpty) return;
                                 moneyPerTask = double.parse(v);
@@ -306,15 +309,11 @@ class _EditNewItemState extends State<EditNewItem> {
                                 child: TextFormField(
                               decoration:
                                   InputDecoration(labelText: 'Money combo'),
-                              validator: (String? v) {
-                                if (v == null || v.isEmpty)
-                                  return 'This filed must have a value';
-                                try {
-                                  double.parse(v);
-                                } catch (_) {
-                                  return 'This filed must be a number';
-                                }
-                              },
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
+                              validator: validator,
                               onSaved: (String? v) {
                                 if (v == null || v.isEmpty) return;
                                 moneyPerTaskCombo = double.parse(v);
@@ -326,15 +325,11 @@ class _EditNewItemState extends State<EditNewItem> {
                         TextFormField(
                           decoration: InputDecoration(
                               labelText: 'Extra xp lost per task'),
-                          validator: (String? v) {
-                            if (v == null || v.isEmpty)
-                              return 'This filed must have a value';
-                            try {
-                              double.parse(v);
-                            } catch (_) {
-                              return 'This filed must be a number';
-                            }
-                          },
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
+                          validator: validator,
                           onSaved: (String? v) {
                             if (v == null || v.isEmpty) return;
                             xpLost = double.parse(v);
@@ -344,15 +339,11 @@ class _EditNewItemState extends State<EditNewItem> {
                         TextFormField(
                           decoration: InputDecoration(
                               labelText: 'Extra money lost when faield'),
-                          validator: (String? v) {
-                            if (v == null || v.isEmpty)
-                              return 'This filed must have a value';
-                            try {
-                              double.parse(v);
-                            } catch (_) {
-                              return 'This filed must be a number';
-                            }
-                          },
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
+                          validator: validator,
                           onSaved: (String? v) {
                             if (v == null || v.isEmpty) return;
                             moneyLost = double.parse(v);

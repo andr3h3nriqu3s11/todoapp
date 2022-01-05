@@ -5,29 +5,31 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 class Task {
-  Task(
-      {required this.title,
-      required this.id,
-      this.generatorId = "",
-      this.date,
-      this.icon,
-      this.done = false,
-      this.fail = false,
-      this.xp = 0,
-      this.money = 0,
-      this.moneyLost = 0,
-      this.xpLost = 0,
-      this.notificationId,
-      this.userRemovedFromFail = false,
-      this.taskType,
-      this.failTasks})
-      : this.generatedFailIds = [];
+  Task({
+    required this.title,
+    required this.id,
+    required this.generatorType,
+    required this.generatorId,
+    this.date,
+    this.icon,
+    this.done = false,
+    this.fail = false,
+    this.xp = 0,
+    this.money = 0,
+    this.moneyLost = 0,
+    this.xpLost = 0,
+    this.notificationId,
+    this.userRemovedFromFail = false,
+    this.failTasks,
+    this.generatedFailIds = const [],
+  });
 
   //Ids
   String id;
   String generatorId;
+  TaskTypeEnum generatorType;
 
-  List<String> generatedFailIds;
+  List<String> generatedFailIds = [];
   //Notification
   int? notificationId;
 
@@ -36,7 +38,6 @@ class Task {
   bool fail;
   IconData? icon;
   DateTime? date;
-  TaskType? taskType;
 
   // Fail Actions
   List<String>? failTasks;
@@ -51,18 +52,28 @@ class Task {
   double moneyLost;
 
   static emptyTask() {
-    return new Task(title: "", id: "");
+    return new Task(
+        title: "", id: "", generatorType: TaskTypeEnum.once, generatorId: "");
   }
 
   Task clone() {
     return Task(
         id: this.id,
         generatorId: this.generatorId,
+        generatorType: this.generatorType,
+        generatedFailIds: this.generatedFailIds,
+        failTasks: this.failTasks,
+        icon: this.icon,
+        moneyLost: this.moneyLost,
+        money: this.money,
+        xpLost: this.xpLost,
+        xp: this.xp,
+        notificationId: this.notificationId,
         title: this.title,
         date: this.date,
         done: this.done,
         fail: this.fail,
-        taskType: this.taskType);
+        userRemovedFromFail: this.userRemovedFromFail);
   }
 
   Map<String, dynamic> toJSON() {
@@ -82,12 +93,15 @@ class Task {
       "fail": this.fail,
       "icon": icon,
       "date": this.date == null ? null : this.date!.toIso8601String(),
-      "taskType": this.taskType == null ? null : this.taskType!.toJson(),
       "xp": this.xp,
       "money": this.money,
       "xpLost": this.xpLost,
       "moneyLost": this.moneyLost,
       "failTasks": this.failTasks,
+      "generatorType": this.generatorType.index,
+      "generatedFailIds": this.generatedFailIds,
+      "notificationId": this.notificationId,
+      "userRemovedFromFail": this.userRemovedFromFail,
     };
   }
 
@@ -107,13 +121,15 @@ class Task {
       fail: json["fail"],
       icon: icon,
       date: json["date"] == null ? null : DateTime.tryParse(json["date"]),
-      taskType:
-          json["taskType"] == null ? null : TaskType.fromJson(json["taskType"]),
       xp: json["xp"],
       money: json["money"],
       xpLost: json["xpLost"],
       moneyLost: json["moneyLost"],
-      failTasks: json["failTasks"],
+      failTasks: ["failTasks"].toList().cast<String>(),
+      generatedFailIds: json["generatedFailIds"].toList().cast<String>(),
+      notificationId: json["notificationId"],
+      userRemovedFromFail: json["userRemovedFromFail"],
+      generatorType: TaskTypeEnum.values[json["generatorType"]],
     );
   }
 
@@ -181,8 +197,11 @@ class Task {
       });
 
       generatedFailIds = [];
-    } else
+    } else {
+      if (date != null && date!.compareTo(DateTime.now()) < 0)
+        userRemovedFromFail = true;
       profile.removeWinnings(this);
+    }
   }
 }
 
@@ -389,6 +408,8 @@ class TaskGenerators {
         }
       } catch (e) {
         //TODO: Deal with the error in the future
+        print("Failed to load gen");
+        print(e);
       }
     });
 

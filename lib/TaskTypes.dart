@@ -1,5 +1,7 @@
 import 'package:app/Task.dart';
 
+enum TaskTypeEnum { once, fail, repeat }
+
 abstract class TaskType {
   TaskType(
       {required this.xpPerTask,
@@ -16,11 +18,12 @@ abstract class TaskType {
   Map<String, dynamic> toJson();
 
   factory TaskType.fromJson(Map<String, dynamic> json) {
-    if (json["type"] == "once") {
+    TaskTypeEnum t = TaskTypeEnum.values[json["type"]];
+    if (t == TaskTypeEnum.once) {
       return TaskTypeOnce.fromJson(json["json"]);
-    } else if (json["type"] == "repeatEveryDay") {
+    } else if (t == TaskTypeEnum.repeat) {
       return TaskTypeRepeatEveryDay.fromJson(json["json"]);
-    } else if (json["type"] == "failTask") {
+    } else if (t == TaskTypeEnum.fail) {
       return TaskTypeFailTask.fromJson(json["json"]);
     } else {
       throw Exception("InvalidJson");
@@ -70,14 +73,11 @@ class TaskTypeOnce extends TaskType {
     Task newTask = baseTask.clone()..generateIdUUId();
     newTask.date = this.date;
     newTask.id = this.id;
-    newTask.taskType = this;
     newTask.xp = this.xpPerTask;
     newTask.money = this.moneyPerTask;
     newTask.xpLost = this.xpLost;
     newTask.moneyLost = this.moneyLost;
-    if (this.date.isBefore(DateTime.now())) {
-      newTask.userRemovedFromFail = true;
-    }
+    if (this.date.isBefore(DateTime.now())) newTask.userRemovedFromFail = true;
     return newTask;
   }
 
@@ -89,7 +89,7 @@ class TaskTypeOnce extends TaskType {
   @override
   Map<String, dynamic> toJson() {
     return {
-      'type': 'once',
+      'type': TaskTypeEnum.once.index,
       'json': {
         "xpPerTask": this.xpPerTask,
         "xpLost": this.xpLost,
@@ -151,9 +151,7 @@ class TaskTypeRepeatEveryDay extends TaskType {
     Task? lastTask;
 
     oldTasks
-        .where((element) =>
-            (element.taskType is TaskTypeRepeatEveryDay) &&
-            element.generatorId == this.id)
+        .where((element) => element.generatorId == this.id)
         .forEach((element) {
       if (lastTask == null && element.date != null) {
         lastTask = element;
@@ -175,14 +173,12 @@ class TaskTypeRepeatEveryDay extends TaskType {
     newTask.date = DateTime(
         today.year, today.month, today.day, this.date.hour, this.date.minute);
     newTask.generatorId = this.id;
-    newTask.taskType = this;
     newTask.xp = this.xpPerTask;
     newTask.money = this.moneyPerTask;
     newTask.xpLost = this.xpLost;
     newTask.moneyLost = this.moneyLost;
-    if (newTask.date!.isBefore(DateTime.now())) {
+    if (newTask.date!.isBefore(DateTime.now()))
       newTask.userRemovedFromFail = true;
-    }
     return newTask;
   }
 
@@ -191,16 +187,13 @@ class TaskTypeRepeatEveryDay extends TaskType {
     Task? lastTask;
 
     oldTasks
-        .where((element) => element.taskType is TaskTypeRepeatEveryDay)
+        .where((element) => element.generatorId == this.id)
         .forEach((element) {
-      if (lastTask == null &&
-          element.date != null &&
-          element.generatorId == this.id) {
+      if (lastTask == null && element.date != null) {
         lastTask = element;
       } else if (lastTask != null &&
           element.date != null &&
-          lastTask!.date!.isBefore(element.date!) &&
-          element.generatorId == this.id) {
+          lastTask!.date!.isBefore(element.date!)) {
         lastTask = element;
       }
     });
@@ -219,7 +212,6 @@ class TaskTypeRepeatEveryDay extends TaskType {
     newTask.date = DateTime(tomorrow.year, tomorrow.month, tomorrow.day,
         this.date.hour, this.date.minute);
     newTask.generatorId = this.id;
-    newTask.taskType = this;
     newTask.xp = this.xpPerTask;
     newTask.money = this.moneyPerTask;
     newTask.xpLost = this.xpLost;
@@ -230,7 +222,7 @@ class TaskTypeRepeatEveryDay extends TaskType {
   @override
   Map<String, dynamic> toJson() {
     return {
-      'type': 'repeatEveryDay',
+      'type': TaskTypeEnum.repeat.index,
       'json': {
         "xpPerTask": this.xpPerTask,
         "xpLost": this.xpLost,
@@ -299,7 +291,7 @@ class TaskTypeFailTask extends TaskType {
   @override
   Map<String, dynamic> toJson() {
     return {
-      'type': 'fail',
+      'type': TaskTypeEnum.fail.index,
       'json': {
         "xpPerTask": this.xpPerTask,
         "xpLost": this.xpLost,
@@ -321,15 +313,13 @@ class TaskTypeFailTask extends TaskType {
   Task generateFail(Task baseTask) {
     Task newTask = baseTask.clone()..generateIdUUId();
     newTask.generatorId = this.id;
-    newTask.taskType = this;
     newTask.xp = this.xpPerTask;
     newTask.money = this.moneyPerTask;
     newTask.xpLost = this.xpLost;
     newTask.moneyLost = this.moneyLost;
 
     DateTime date = DateTime.now();
-    date.add(Duration(days: this.daysToComplete));
-    newTask.date = date;
+    newTask.date = date.add(Duration(days: this.daysToComplete));
 
     return newTask;
   }

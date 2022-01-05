@@ -184,58 +184,60 @@ class _MyHomePageState extends State<MyHomePage> {
     tz.Location location =
         tz.getLocation(await FlutterNativeTimezone.getLocalTimezone());
 
+    // Checks all the tasks to if they need to be marked as failed
     manager!.active.forEach((task) {
-      if ((task.taskType is TaskTypeOnce ||
-              task.taskType is TaskTypeRepeatEveryDay ||
-              task.taskType is TaskTypeFailTask) &&
-          generalNotificationDetails != null) {
-        //Check the task
-        //If the task is already past the time and was not recoverd by the user
-        // then marked it as failed
-        if (task.date!.isBefore(DateTime.now())) {
-          // If the user did not change this to the fail position then
-          // change to a failed notification
-          if (!task.userRemovedFromFail) {
-            //Call the fail function to deal with the points
-            task.taskFail(generators!, manager!, profile!);
-            setState(() {
-              deletedTasksNotification.add(task);
-            });
-          }
-        } else if (task.date!
-            .subtract(Duration(minutes: 15))
-            .isBefore(DateTime.now())) {
-          // Create a notification
-          if (task.notificationId != null)
-            localNotification.cancel(task.notificationId!);
-
-          task.notificationId = Uuid().v1().hashCode;
-
-          localNotification.show(
-              task.notificationId!,
-              "A task needs to be done",
-              "The Task: " + task.title + " needs to be completed.",
-              generalNotificationDetails!);
-        } else {
-          // Create a notification
-          if (task.notificationId != null)
-            localNotification.cancel(task.notificationId!);
-
-          task.notificationId = Uuid().v1().hashCode;
-
-          var date = tz.TZDateTime.from(
-              task.date!.subtract(Duration(minutes: 15)), location);
-
-          localNotification.zonedSchedule(
-              task.notificationId!,
-              "A task needs to be done",
-              "The task: " + task.title + " needs to be completed.",
-              date,
-              generalNotificationDetails!,
-              uiLocalNotificationDateInterpretation:
-                  UILocalNotificationDateInterpretation.absoluteTime,
-              androidAllowWhileIdle: true);
+      //Check the task
+      //If the task is already past the time and was not recoverd by the user
+      // then marked it as failed
+      if (task.date!.isBefore(DateTime.now())) {
+        // If the user did not change this to the fail position then
+        // change to a failed notification
+        if (!task.userRemovedFromFail) {
+          //Call the fail function to deal with the points
+          task.taskFail(generators!, manager!, profile!);
+          setState(() {
+            deletedTasksNotification.add(task);
+          });
         }
+        return;
+      }
+
+      // The next part deals with notifications so if they are not initialized correctly then
+      // don't run the next part
+      if (generalNotificationDetails != null) return;
+
+      if (task.date!.subtract(Duration(minutes: 15)).isBefore(DateTime.now())) {
+        // Create a notification
+        if (task.notificationId != null)
+          localNotification.cancel(task.notificationId!);
+
+        task.notificationId = Uuid().v1().hashCode;
+
+        localNotification.show(
+            task.notificationId!,
+            "A task needs to be done within 15 minutes",
+            "The Task: " + task.title + " needs to be completed.",
+            generalNotificationDetails!);
+      } else {
+        // Create a notification
+        if (task.notificationId != null)
+          localNotification.cancel(task.notificationId!);
+
+        task.notificationId = Uuid().v1().hashCode;
+
+        var date = tz.TZDateTime.from(
+            task.date!.subtract(Duration(minutes: 15)), location);
+
+        //TODO: add time to the notification
+        localNotification.zonedSchedule(
+            task.notificationId!,
+            "A task needs to be done",
+            "The task: " + task.title + " needs to be completed.",
+            date,
+            generalNotificationDetails!,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            androidAllowWhileIdle: true);
       }
     });
 
