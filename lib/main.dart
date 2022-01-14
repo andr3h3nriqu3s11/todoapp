@@ -1,6 +1,5 @@
 import 'dart:math';
 
-import 'package:app/TaskTypes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
@@ -130,7 +129,7 @@ class _MyHomePageState extends State<MyHomePage> {
       this.generators = gens ?? TaskGenerators(tasks: {});
       this.profile = profile;
       this.isProfileCreated = isProfileCreated;
-      generateTasks(null);
+      generateTasks();
     });
   }
 
@@ -180,7 +179,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   //! Note: This function saves the db
-  Future checkTasks(BuildContext? context) async {
+  Future checkTasks() async {
     tz.Location location =
         tz.getLocation(await FlutterNativeTimezone.getLocalTimezone());
 
@@ -241,21 +240,6 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     });
 
-    /*DateTime nowTime = new DateTime.now();
-
-    List<Task> newOldTasks = tasks
-        .where((e) =>
-            e.date!.month <= nowTime.month && e.date!.year <= nowTime.year)
-        .toList();
-
-    tasks = tasks
-        .where((element) =>
-            element.date!.month >= nowTime.month &&
-            element.date!.year >= nowTime.year)
-        .toList();
-
-    oldTasks = [...oldTasks, ...newOldTasks];*/
-
     saveDb();
   }
 
@@ -269,18 +253,18 @@ class _MyHomePageState extends State<MyHomePage> {
                     generators!.add(task);
                     await this.saveDb();
                     Navigator.pop(context);
-                    generateTasks(context);
+                    generateTasks();
                   },
                 )));
   }
 
   //! Note: this function calls the checkTasks function
-  void generateTasks(BuildContext? context) {
+  void generateTasks() {
     setState(() {
       ghostTasks = generators!.generate(manager!, profile!);
     });
     localNotification.cancelAll();
-    checkTasks(context);
+    checkTasks();
   }
 
   void _changePage(int index) {
@@ -289,6 +273,7 @@ class _MyHomePageState extends State<MyHomePage> {
         limit = 1;
       });
     }
+    if (index == 0) checkTasks();
     setState(() {
       _selectedIndex = index;
     });
@@ -321,7 +306,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 setState(() {
                   lastTaskDone = !a.done ? null : a;
                 });
-                generateTasks(context);
+                generateTasks();
               },
             ))
         .toList();
@@ -371,7 +356,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 setState(() {
                   lastTaskDone = !a.done ? null : a;
                 });
-                generateTasks(context);
+                generateTasks();
               },
             ))
         .toList();
@@ -490,7 +475,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 setState(() {
                   lastTaskDone = !a.done ? null : a;
                 });
-                generateTasks(context);
+                generateTasks();
               },
             )
           ],
@@ -521,7 +506,7 @@ class _MyHomePageState extends State<MyHomePage> {
           });
     }
 
-    if (deletedTasksNotification.length > 0 && deletedTasksShown) {
+    if (deletedTasksNotification.length > 0 && !deletedTasksShown) {
       setState(() {
         deletedTasksShown = true;
       });
