@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:app/EditItem.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
@@ -14,7 +15,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:app/BoxHolder.dart';
 import 'package:app/DialogDeletedItems.dart';
-import 'package:app/EditNewItem.dart';
+import 'package:app/EditTaskItem.dart';
 import 'package:app/Profile.dart';
 import 'package:app/Start.dart';
 import 'package:app/Task.dart';
@@ -245,9 +246,14 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _newItemPage(BuildContext context) {
     Navigator.push(
+        context, MaterialPageRoute(builder: (context) => EditNewItemRoute()));
+  }
+
+  void _newTaskPage(BuildContext context) {
+    Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (context) => EditNewItemRoute(
+            builder: (context) => EditNewTaskRoute(
                   failTasksGenerators: this.generators!.fail.toList(),
                   newTaskGenerator: (TaskGenerator task) async {
                     generators!.add(task);
@@ -268,7 +274,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _changePage(int index) {
-    if (index == 1) {
+    if (index == 2) {
       setState(() {
         limit = 1;
       });
@@ -528,50 +534,70 @@ class _MyHomePageState extends State<MyHomePage> {
             ? _buildToDoTask(context)
             : _selectedIndex == 1
                 ? _buildDoneTask(context)
-                : ProfileWidget(
-                    profile: this.profile!,
-                    removeTaskGenerator: (TaskGenerator e) {
-                      setState(() {
-                        generators!.remove(e, manager!);
-                      });
-                      this.saveDb();
-                    },
-                    taskGenerators: generators!.lists.toList(),
-                    //TODO: Improve this
-                    logOut: () {
-                      setState(() {
-                        this.profile =
-                            Profile(level: 0, xp: 0, money: 0, name: '');
-                        this.store!.record('profile').delete(this.db!);
-                        this.store!.record('taks').delete(this.db!);
-                        this.store!.record('taskGenerators').delete(this.db!);
-                        isProfileCreated = false;
-                        manager = TaskManager({}, {});
-                        generators = TaskGenerators(tasks: {});
-                        ghostTasks = [];
-                        lastTaskDone = null;
-                      });
-                    },
-                  ),
+                : _selectedIndex == 2
+                    ? _buildDoneTask(context)
+                    : ProfileWidget(
+                        profile: this.profile!,
+                        removeTaskGenerator: (TaskGenerator e) {
+                          setState(() {
+                            generators!.remove(e, manager!);
+                          });
+                          this.saveDb();
+                        },
+                        taskGenerators: generators!.lists.toList(),
+                        //TODO: Improve this
+                        logOut: () {
+                          setState(() {
+                            this.profile =
+                                Profile(level: 0, xp: 0, money: 0, name: '');
+                            this.store!.record('profile').delete(this.db!);
+                            this.store!.record('taks').delete(this.db!);
+                            this
+                                .store!
+                                .record('taskGenerators')
+                                .delete(this.db!);
+                            isProfileCreated = false;
+                            manager = TaskManager({}, {});
+                            generators = TaskGenerators(tasks: {});
+                            ghostTasks = [];
+                            lastTaskDone = null;
+                          });
+                        },
+                      ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        //TODO: improve this
-        items: [
-          BottomNavigationBarItem(icon: const Icon(Icons.list), label: 'Tasks'),
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.access_time_filled_sharp),
-              label: 'Old Tasks'),
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.person), label: 'Profile'),
-        ],
-        currentIndex: _selectedIndex,
-        onTap: _changePage,
+      bottomNavigationBar: BottomAppBar(
+        shape: const CircularNotchedRectangle(),
+        child: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          //TODO: improve this
+          items: const [
+            BottomNavigationBarItem(
+                icon: const Icon(Icons.list), label: 'Tasks'),
+            BottomNavigationBarItem(
+                icon: const Icon(Icons.access_time_filled_sharp),
+                label: 'Old Tasks'),
+            BottomNavigationBarItem(
+                icon: const Icon(Icons.insert_emoticon_rounded),
+                label: 'Items'),
+            BottomNavigationBarItem(
+                icon: const Icon(Icons.person), label: 'Profile'),
+          ],
+          currentIndex: _selectedIndex,
+          onTap: _changePage,
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _newItemPage(context),
-        tooltip: 'Add new task',
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: _selectedIndex == 0 || _selectedIndex == 1
+          ? FloatingActionButton(
+              onPressed: () => _newTaskPage(context),
+              tooltip: 'Add new task',
+              child: const Icon(Icons.add),
+            )
+          : _selectedIndex == 2
+              ? FloatingActionButton(
+                  onPressed: () => _newItemPage(context),
+                  tooltip: 'Add new Item',
+                  child: const Icon(Icons.add))
+              : null,
       floatingActionButtonLocation:
           FloatingActionButtonLocation.miniCenterDocked,
     );

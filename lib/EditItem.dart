@@ -10,33 +10,25 @@ import 'package:app/Task.dart';
 import 'package:uuid/uuid.dart';
 
 class EditNewItemRoute extends StatelessWidget {
-  EditNewItemRoute(
-      {Key? key,
-      required this.newTaskGenerator,
-      required this.failTasksGenerators})
-      : super(key: key);
+  EditNewItemRoute({
+    Key? key,
+  }) : super(key: key);
 
   final GlobalKey<_EditNewItemState> _myEdit = GlobalKey();
-
-  final ValueChanged<TaskGenerator> newTaskGenerator;
-  final List<TaskGenerator> failTasksGenerators;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text("Create new task")),
+        appBar: AppBar(title: Text("Create new Item")),
         body: Padding(
           child: EditNewItem(
             key: _myEdit,
-            failTaskGenerators: this.failTasksGenerators,
           ),
           padding: EdgeInsets.only(top: 5),
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            TaskGenerator? gen = _myEdit.currentState!.submit();
-            if (gen == null) return;
-            newTaskGenerator(gen);
+            //TODO
           },
           child: Icon(Icons.add),
           tooltip: 'Finish',
@@ -45,10 +37,7 @@ class EditNewItemRoute extends StatelessWidget {
 }
 
 class EditNewItem extends StatefulWidget {
-  const EditNewItem({Key? key, required this.failTaskGenerators})
-      : super(key: key);
-
-  final List<TaskGenerator> failTaskGenerators;
+  const EditNewItem({Key? key}) : super(key: key);
 
   @override
   State<StatefulWidget> createState() => _EditNewItemState();
@@ -360,16 +349,7 @@ class _EditNewItemState extends State<EditNewItem> {
   //Task Section
   Widget _buildTaskFailList() {
     //Create the list for the dropdown
-    List<DropdownMenuItem<TaskGenerator>> failTaskList = this
-        .widget
-        .failTaskGenerators
-        .where((element) => this.failTasksIds.indexOf(element) == -1)
-        .map((e) {
-      return DropdownMenuItem(
-        value: e,
-        child: Text(e.base.title),
-      );
-    }).toList();
+    List<DropdownMenuItem<TaskGenerator>> failTaskList = [];
 
     if (failTaskList.length == 0 && this.failTasksIds.length == 0)
       return Padding(
