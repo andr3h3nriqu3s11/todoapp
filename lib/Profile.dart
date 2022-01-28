@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:app/Item.dart';
 import 'package:app/Task.dart';
 import 'package:app/Utils.dart';
 import 'package:flutter/material.dart';
@@ -82,18 +83,28 @@ class Profile {
   double xp;
   double money;
 
+  Invetory inv;
+
   Profile(
-      {required this.name,
+      {required this.inv,
+      required this.name,
       required this.level,
       required this.xp,
       required this.money});
 
   factory Profile.fromJson(Map<String, dynamic> json) {
+    Invetory? inv;
+    try {
+      inv = Invetory.fromJSON(json["inv"]);
+    } catch (e) {
+      inv = Invetory(items: {}, itemTemplates: {});
+    }
     return Profile(
       name: json["name"],
       level: json["level"],
       xp: json["xp"],
       money: json["money"],
+      inv: inv,
     );
   }
 
@@ -150,7 +161,8 @@ class Profile {
       "name": this.name,
       "level": this.level,
       "xp": this.xp,
-      "money": this.money
+      "money": this.money,
+      "inv": this.inv.toJSON(),
     };
   }
 }
